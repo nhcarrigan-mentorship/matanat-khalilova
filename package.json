@@ -1,0 +1,21 @@
+{
+  "name": "matanat-khalilova",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/NHCarrigan-Mentorship/matanat-khalilova.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/NHCarrigan-Mentorship/matanat-khalilova/issues"
+  },
+  "homepage": "https://github.com/NHCarrigan-Mentorship/matanat-khalilova#readme"
+}
