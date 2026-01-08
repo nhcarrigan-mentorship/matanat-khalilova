@@ -3,7 +3,7 @@ node_modules/
 .pnp
 .pnp.js
 
-# Environment Variables (IMPORTANT: keep your AI keys secret!)
+# Environment Variables (keeping AI keys secret)
 .env
 .env.local
 .env.development.local
