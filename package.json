@@ -7,6 +7,7 @@
     "start": "node index.js",
     "lint": "eslint . --ext .js,.jsx --no-error-on-unmatched-pattern", 
     "format": "prettier --write .",
+    "format:check": "prettier --check .",
     "build": "echo 'Building project...' && exit 0",
     "test": "echo \"No tests implemented yet\" && exit 0"
   },
