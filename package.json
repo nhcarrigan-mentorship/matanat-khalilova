@@ -5,7 +5,7 @@
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
-    "lint": "eslint . --ext .js,.jsx --no-error-on-unmatched-pattern", 
+    "lint": "eslint . --ext .js,.jsx --no-error-on-unmatched-pattern",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "build": "echo 'Building project...' && exit 0",
@@ -15,7 +15,8 @@
     "type": "git",
     "url": "git+https://github.com/NHCarrigan-Mentorship/matanat-khalilova.git"
   },
-  "keywords": ["AI",
+  "keywords": [
+    "AI",
     "Atypical Speech Recognition",
     "AAC",
     "Accessibility",
