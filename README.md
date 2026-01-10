@@ -34,6 +34,8 @@ In the project directory, you can run the following commands:
 | :--- | :--- |
 | `npm start` | Runs the app in development mode. |
 | `npm run lint` | Checks code quality and style using ESLint. |
+| `npm run format` | **Fixes** code formatting automatically using Prettier. |
+| `npm run format:check` | **Verifies** that the code follows formatting rules (used by CI). |
 | `npm run build` | Builds the app for production. |
 | `npm test` | Runs the test suite (currently set to placeholder). |
 
