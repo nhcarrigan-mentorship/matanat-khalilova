@@ -1,0 +1,20 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Environment Variables (keeping AI keys secret)
+.env
+.env.local
+.env.development.local
+
+# Python junk
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+
+# Production builds
+build/
+dist/
