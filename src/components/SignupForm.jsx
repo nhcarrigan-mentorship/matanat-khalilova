@@ -16,7 +16,6 @@ const SignupForm = () => {
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    console.log("Form submitted!", formData);
     alert(`Welcome to VoiceBridge, ${formData.name}!`);
   };
 
@@ -24,13 +23,29 @@ const SignupForm = () => {
     <form onSubmit={handleSubmit}>
       <h2>Join VoiceBridge</h2>
       <label htmlFor="name">Full Name:</label>
-      <input type="text" id="name" placeholder="Enter your name" required />
+      <input
+        type="text"
+        id="name"
+        value={formData.name}
+        onChange={handleChange}
+        placeholder="Enter your name"
+        required
+      />
       <label htmlFor="email">Email:</label>
-      <input type="email" id="email" placeholder="email@example.com" required />
+      <input
+        type="email"
+        id="email"
+        value={formData.email}
+        onChange={handleChange}
+        placeholder="email@example.com"
+        required
+      />
       <label htmlFor="password">Password:</label>
       <input
         type="password"
         id="password"
+        value={formData.password}
+        onChange={handleChange}
         placeholder="Min 8 characters"
         required
       />
