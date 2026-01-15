@@ -1,4 +1,4 @@
-import React from 'react';
+import React from "react";
 
 const SignupForm = () => {
   return <h2>Signup Form</h2>;
