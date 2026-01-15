@@ -4,12 +4,12 @@
   "description": "AI-powered voice accessibility platform specializing in atypical speech recognition and clarification to improve communication clarity for individuals with speech disabilities",
   "main": "index.js",
   "scripts": {
-    "start": "node index.js",
+    "start": "react-scripts start",
     "lint": "eslint . --ext .js,.jsx --no-error-on-unmatched-pattern",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "build": "echo 'Building project...' && exit 0",
-    "test": "echo \"No tests implemented yet\" && exit 0"
+    "build": "react-scripts build",
+    "test": "react-scripts test"
   },
   "repository": {
     "type": "git",
@@ -32,11 +32,16 @@
   "type": "commonjs",
   "devDependencies": {
     "eslint": "^8.57.0",
-    "prettier": "^3.2.5",
-    "eslint-config-prettier": "^9.1.0"
+    "eslint-config-prettier": "^9.1.0",
+    "prettier": "^3.2.5"
   },
   "bugs": {
     "url": "https://github.com/NHCarrigan-Mentorship/matanat-khalilova/issues"
   },
-  "homepage": "https://github.com/NHCarrigan-Mentorship/matanat-khalilova#readme"
+  "homepage": "https://github.com/NHCarrigan-Mentorship/matanat-khalilova#readme",
+  "dependencies": {
+    "react": "^19.2.3",
+    "react-dom": "^19.2.3",
+    "react-scripts": "^5.0.1"
+  }
 }
