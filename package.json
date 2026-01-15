@@ -9,7 +9,7 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "build": "react-scripts build",
-    "test": "react-scripts test"
+    "test": "react-scripts test --watchAll=false --passWithNoTests"
   },
   "repository": {
     "type": "git",
