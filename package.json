@@ -13,7 +13,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/NHCarrigan-Mentorship/matanat-khalilova.git"
+    "url": "git+https://github.com/nhcarrigan-mentorship/matanat-khalilova.git"
   },
   "keywords": [
     "AI",
@@ -36,9 +36,9 @@
     "prettier": "^3.2.5"
   },
   "bugs": {
-    "url": "https://github.com/NHCarrigan-Mentorship/matanat-khalilova/issues"
+    "url": "https://github.com/nhcarrigan-mentorship/matanat-khalilova/issues"
   },
-  "homepage": "https://github.com/NHCarrigan-Mentorship/matanat-khalilova#readme",
+  "homepage": "https://github.com/nhcarrigan-mentorship/matanat-khalilova#readme",
   "dependencies": {
     "react": "^19.2.3",
     "react-dom": "^19.2.3",
