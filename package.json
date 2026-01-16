@@ -41,7 +41,7 @@
   "bugs": {
     "url": "https://github.com/nhcarrigan-mentorship/matanat-khalilova/issues"
   },
-  "homepage": "https://github.com/nhcarrigan-mentorship/matanat-khalilova#readme",
+  "homepage": ".",
   "dependencies": {
     "react": "^19.2.3",
     "react-dom": "^19.2.3",
