@@ -47,7 +47,6 @@ const SignupForm = () => {
     <div className="form-container">
       <form onSubmit={handleSubmit}>
         <h2>Join VoiceBridge</h2>
-        {error && <p style={{ color: "red", fontWeight: "bold" }}>{error}</p>}
         <label htmlFor="name">Full Name:</label>
         <input
           type="text"
@@ -75,6 +74,7 @@ const SignupForm = () => {
           placeholder="Min 8 characters"
           required
         />
+        {error && <p style={{ color: "red", fontWeight: "bold" }}>{error}</p>}
         <button type="submit" className="signup-button">
           Sign Up
         </button>
