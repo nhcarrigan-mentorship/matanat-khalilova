@@ -75,5 +75,5 @@ In the project directory, you can run the following commands:
 
 ### 4. Code Quality Tools
 
-- JavaScript: We use ESLint 8 for linting to ensure clean and consistent code.
-- Python: We adhere to **PEP8** standards by using a suite of quality tools. We use **Black** for formatting, **isort** for import organization, **Flake8** for linting and **Bandit** for automated security vulnerability scanning. Configuration settings can be found in `pyproject.toml` and `.flake8`.
+- **JavaScript**: We use **ESLint 8** for linting to ensure clean and consistent code.
+- **Python**: We adhere to **PEP8** standards by using a suite of quality tools. We use **Black** for formatting, **isort** for import organization, **Flake8** for linting and **Bandit** for automated security vulnerability scanning. Configuration settings can be found in `pyproject.toml` and `.flake8`.

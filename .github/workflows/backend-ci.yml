@@ -58,6 +58,8 @@ jobs:
           python -c "import fastapi; import pydantic; print('Core libraries loaded!')"
 
       - name: Run Tests
+        env:
+          MONGODB_URL: ${{ secrets.MONGODB_URL }}
         run: |
           cd backend
           pytest
