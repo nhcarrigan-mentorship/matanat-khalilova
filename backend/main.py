@@ -1,7 +1,8 @@
+import re
+
+import bcrypt
 from fastapi import FastAPI
 from pydantic import BaseModel, EmailStr, field_validator
-import bcrypt
-import re
 
 app = FastAPI()
 

@@ -1,0 +1,57 @@
+name: Backend CI Quality Check
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+    branches: [main]
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.10"
+      
+      - name: Install Linting Tools
+        run: pip install black flake8 isort
+      - name: Run Lint
+        run: |
+          cd backend
+          isort --check-only --profile black .
+          flake8 .
+          black --check .
+
+      - name: Security scan with Bandit
+        run: |
+          pip install bandit
+          cd backend
+          bandit -r . -ll
+
+      - name: Environment Check
+        run: |
+          cd backend
+          python -c "import fastapi; import pydantic; print('Core libraries loaded!')"
+
+      # Install requirements only if they changed (Caching)
+      - name: Cache Pip
+        uses: actions/cache@v3
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
+      - name: Install dependencies
+        run: |
+          cd backend
+          pip install -r requirements.txt
+          pip install pytest
+
+      - name: Run Tests
+        run: |
+          cd backend
+          pytest
