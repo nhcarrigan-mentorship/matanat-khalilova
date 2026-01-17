@@ -14,6 +14,7 @@ __pycache__/
 *$py.class
 .venv/
 venv/
+.pytest_cache/
 
 # Production builds
 build/

@@ -14,6 +14,12 @@
 
 ## Quality Control Checklist
 
+- [ ] My branch is up to date with `main`.
+- [ ] I have followed the project's code style guidelines.
+- [ ] All changes are focused on a single task.
+- [ ] I have updated README with relevant information (if applicable).
+- [ ] My commit messages are clear and descriptive.
+
 ### Python Backend
 
 - [ ] Code formatted with Black and isort.
