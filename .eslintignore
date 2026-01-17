@@ -1,0 +1,5 @@
+node_modules/
+backend/venv/
+backend/
+dist/
+build/
