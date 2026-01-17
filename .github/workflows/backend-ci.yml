@@ -31,11 +31,6 @@ jobs:
           cd backend
           bandit -r . -ll
 
-      - name: Environment Check
-        run: |
-          cd backend
-          python -c "import fastapi; import pydantic; print('Core libraries loaded!')"
-
       # Install requirements only if they changed (Caching)
       - name: Cache Pip
         uses: actions/cache@v3
@@ -50,6 +45,11 @@ jobs:
           cd backend
           pip install -r requirements.txt
           pip install pytest
+
+      - name: Environment Check
+        run: |
+          cd backend
+          python -c "import fastapi; import pydantic; print('Core libraries loaded!')"
 
       - name: Run Tests
         run: |
