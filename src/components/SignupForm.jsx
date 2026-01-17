@@ -16,7 +16,7 @@ const SignupForm = () => {
     });
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
 
     const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -40,7 +40,28 @@ const SignupForm = () => {
       return;
     }
     setError("");
-    alert(`Welcome to VoiceBridge, ${formData.name}!`);
+
+    try {
+      const response = await fetch("http://127.0.0.1:8000/api/auth/signup", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(formData),
+      });
+      const data = await response.json();
+
+      if (response.ok) {
+        alert(
+          `Success! Account created for ${formData.email}. Welcome to VoiceBridge, ${formData.name}!`,
+        );
+        setFormData({ name: "", email: "", password: "" });
+      } else {
+        setError(data.detail || "Signup failed. Please try again.");
+      }
+    } catch (error) {
+      setError("Cannot connect to the server. is the Backend running?");
+    }
   };
 
   return (
