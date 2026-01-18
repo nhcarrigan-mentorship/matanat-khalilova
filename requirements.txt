@@ -1,8 +1,0 @@
-openai-whisper
-SpeechRecognition
-pyaudio
-librosa
-pydub
-numpy
-python-dotenv
-soundfile

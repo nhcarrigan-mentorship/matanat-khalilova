@@ -1,4 +1,4 @@
-name: CI Quality Check
+name: Frontend CI Quality Check
 
 on:
   push:
