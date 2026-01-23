@@ -5,6 +5,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, EmailStr, field_validator
 
+from auth_utils import create_access_token
 from database import client, users_collection
 
 app = FastAPI()
@@ -17,7 +18,7 @@ def read_root():
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["*"],  # set it to "https://www.voicebridge.com" in production
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -35,6 +36,11 @@ async def health_check():
 
 class UserSignup(BaseModel):
     name: str
+    email: EmailStr
+    password: str
+
+
+class UserLogin(BaseModel):
     email: EmailStr
     password: str
 
@@ -75,4 +81,29 @@ async def signup(user: UserSignup):
         "status": "success",
         "message": f"Account created for {user.email}",
         "user_id": str(result.inserted_id),
+    }
+
+
+@app.post("/api/auth/login")
+async def login(user: UserLogin):
+    # 1. Find user by email
+    existing_user = await users_collection.find_one({"email": user.email})
+    if not existing_user:
+        raise HTTPException(
+            status_code=400,
+            detail="This email is not registered. Please sign up first.",
+        )
+    # 2. Verify password
+    password_bytes = user.password.encode("utf-8")
+    stored_hashed_password = existing_user["password"].encode("utf-8")
+    if not bcrypt.checkpw(password_bytes, stored_hashed_password):
+        raise HTTPException(status_code=400, detail="Invalid email or password")
+    # 3. Create JWT token
+    token = create_access_token(str(existing_user["_id"]))
+    return {
+        "status": "success",
+        "message": f"Welcome back, {existing_user['name']}!",
+        "user_id": str(existing_user["_id"]),
+        "access_token": token,
+        "token_type": "bearer",
     }
