@@ -1,8 +1,10 @@
 import React, { useState } from "react";
 import { Link } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import "./LoginForm.css";
 
 const LoginForm = () => {
+  const navigate = useNavigate();
   const [formData, setFormData] = useState({
     email: "",
     password: "",
@@ -19,11 +21,13 @@ const LoginForm = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
     setError("");
 
     try {
       const response = await fetch("http://127.0.0.1:8000/api/auth/login", {
         method: "POST",
+        credentials: "include",
         headers: {
           "Content-Type": "application/json",
         },
@@ -32,7 +36,8 @@ const LoginForm = () => {
       const data = await response.json();
 
       if (response.ok) {
-        alert(`Welcome back, ${data.name}! You have successfully logged in.`);
+        alert(data.message);
+        navigate("/dashboard");
         setFormData({ email: "", password: "" });
       } else {
         setError(data.message || "Login failed. Please try again.");
