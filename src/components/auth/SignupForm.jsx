@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { useNavigate } from "react-router-dom";
 import "./SignupForm.css";
@@ -11,6 +11,7 @@ const SignupForm = () => {
     password: "",
   });
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
   const handleChange = (e) => {
     setFormData({
@@ -43,6 +44,7 @@ const SignupForm = () => {
       return;
     }
     setError("");
+    setLoading(true);
 
     try {
       const response = await fetch("http://localhost:8000/api/auth/signup", {
@@ -66,8 +68,30 @@ const SignupForm = () => {
       }
     } catch (error) {
       setError("Cannot connect to the server. is the Backend running?");
+    } finally {
+      setLoading(false);
     }
   };
+
+  useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        const response = await fetch("http://localhost:8000/api/auth/me", {
+          method: "GET",
+          credentials: "include",
+        });
+
+        if (response.ok) {
+          navigate("/dashboard");
+        } else {
+          // Not authenticated, stay on signup page
+        }
+      } catch (error) {
+        // Error occurred, stay on signup page;
+      }
+    };
+    checkAuth();
+  }, [navigate]);
 
   return (
     <div className="form-container">
@@ -101,8 +125,15 @@ const SignupForm = () => {
           required
         />
         {error && <p style={{ color: "red", fontWeight: "bold" }}>{error}</p>}
-        <button type="submit" className="signup-button">
-          Sign Up
+        <button
+          type="submit"
+          className="signup-button"
+          disabled={loading}
+          aria-label={
+            loading ? "Creating your account, please wait" : "Sign Up"
+          }
+        >
+          {loading ? "Creating account..." : "Sign Up"}
         </button>
         <p>
           Already have an account?{" "}

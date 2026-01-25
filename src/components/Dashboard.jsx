@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 
 const Dashboard = () => {
   const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -32,12 +33,16 @@ const Dashboard = () => {
   }
 
   const handleLogout = async () => {
+    setLoading(true);
     try {
       await fetch("http://localhost:8000/api/auth/logout", {
         method: "POST",
         credentials: "include",
       });
-      navigate("/login");
+      setTimeout(() => {
+        navigate("/login");
+        setLoading(false);
+      }, 1000);
     } catch (error) {
       console.error("Logout failed", error); // eslint-disable-line no-console
     }
@@ -47,8 +52,13 @@ const Dashboard = () => {
     <div style={{ padding: "20px", textAlign: "center" }}>
       <h1>Welcome, {user.name}!</h1>
       <p>Your email: {user.email}</p>
-      <button onClick={handleLogout} className="logout-button">
-        Log Out
+      <button
+        onClick={handleLogout}
+        className="logout-button"
+        aria-label={loading ? "Logging out, please wait" : "Log Out"}
+        disabled={loading}
+      >
+        {loading ? "Logging out..." : "Log Out"}
       </button>
     </div>
   );

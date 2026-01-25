@@ -47,6 +47,11 @@ button:hover {
   background-color: #a678d1;
 }
 
+button:focus {
+  outline: 1px solid #882cd9;
+  box-shadow: 0 0 0 1.5px #882cd9;
+}
+
 form p {
   text-align: center;
   margin-top: 1rem;

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { useNavigate } from "react-router-dom";
 import "./LoginForm.css";
@@ -49,6 +49,26 @@ const LoginForm = () => {
     }
   };
 
+  useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        const response = await fetch("http://localhost:8000/api/auth/me", {
+          method: "GET",
+          credentials: "include",
+        });
+
+        if (response.ok) {
+          navigate("/dashboard");
+        } else {
+          // Not authenticated, stay on login page
+        }
+      } catch (error) {
+        // Error occurred, stay on login page;
+      }
+    };
+    checkAuth();
+  }, [navigate]);
+
   return (
     <div className="form-container">
       <form onSubmit={handleSubmit}>
@@ -71,7 +91,12 @@ const LoginForm = () => {
           placeholder="Min 8 characters"
           required
         />
-        <button type="submit" disabled={loading} className="signup-button">
+        <button
+          type="submit"
+          disabled={loading}
+          className="signup-button"
+          aria-label={loading ? "Logging in, please wait" : "Log In"}
+        >
           {loading ? "Logging in..." : "Log In"}
         </button>
         {error && <p style={{ color: "red", fontWeight: "bold" }}>{error}</p>}
