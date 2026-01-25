@@ -24,7 +24,7 @@ const Dashboard = () => {
       }
     };
     checkAuth();
-  }, [navigate]); 
+  }, [navigate]);
 
   // If user data is not yet loaded, show a loading message
   if (!user) {
