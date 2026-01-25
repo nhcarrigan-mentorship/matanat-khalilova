@@ -1,11 +1,12 @@
 import re
 
 import bcrypt
+from bson import ObjectId
 from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, EmailStr, field_validator
 
-from auth_utils import create_access_token
+from auth_utils import create_access_token, verify_access_token
 from database import client, users_collection
 
 app = FastAPI()
@@ -59,7 +60,7 @@ class UserLogin(BaseModel):
 
 
 @app.post("/api/auth/signup")
-async def signup(user: UserSignup):
+async def signup(user: UserSignup, response: Response):
     # 1. Check if user already exists
     existing_user = await users_collection.find_one({"email": user.email})
     if existing_user:
@@ -78,6 +79,18 @@ async def signup(user: UserSignup):
 
     # 4. Save to MongoDB
     result = await users_collection.insert_one(new_user)
+
+    # 5. Create JWT token
+    token = create_access_token(str(result.inserted_id))
+
+    response.set_cookie(
+        key="access_token",
+        value=token,
+        httponly=True,
+        max_age=86400,  # 24 hours in seconds
+        samesite="lax",  # Helps prevent CSRF attacks
+        secure=False,  # Set to True while using https:// in production
+    )
 
     return {
         "status": "success",
@@ -124,8 +137,31 @@ async def get_current_user(request: Request):
     token = request.cookies.get("access_token")
     if not token:
         raise HTTPException(status_code=401, detail="Not authenticated")
+    # Verify token and get user ID
+    user_id = verify_access_token(token)
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+    # Look up user in database
+    user = await users_collection.find_one({"_id": ObjectId(user_id)})
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    # Return the user data (don't send password back)
+    return {
+        "status": "success",
+        "user": {
+            "id": str(user["_id"]),
+            "email": user["email"],
+            "name": user["name"],
+        },
+    }
 
-    try:
-        return {"email": "...", "name": "..."}  # Placeholder for actual user data
-    except Exception:
-        raise HTTPException(status_code=401, detail="Invalid token")
+
+@app.post("/api/auth/logout")
+async def logout(response: Response):
+    response.delete_cookie(
+        key="access_token",
+        httponly=True,
+        samesite="lax",
+        secure=False,  # Set to True while using https:// in production
+    )
+    return {"status": "success", "message": "Logged out successfully"}

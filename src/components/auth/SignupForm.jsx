@@ -1,8 +1,10 @@
 import React, { useState } from "react";
 import { Link } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import "./SignupForm.css";
 
 const SignupForm = () => {
+  const navigate = useNavigate();
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -43,8 +45,9 @@ const SignupForm = () => {
     setError("");
 
     try {
-      const response = await fetch("http://127.0.0.1:8000/api/auth/signup", {
+      const response = await fetch("http://localhost:8000/api/auth/signup", {
         method: "POST",
+        credentials: "include",
         headers: {
           "Content-Type": "application/json",
         },
@@ -57,6 +60,7 @@ const SignupForm = () => {
           `Success! Account created for ${formData.email}. Welcome to VoiceBridge, ${formData.name}!`,
         );
         setFormData({ name: "", email: "", password: "" });
+        navigate("/dashboard");
       } else {
         setError(data.detail || "Signup failed. Please try again.");
       }
