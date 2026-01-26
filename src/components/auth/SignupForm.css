@@ -46,3 +46,31 @@ button {
 button:hover {
   background-color: #a678d1;
 }
+
+button:focus {
+  outline: 1px solid #882cd9;
+  box-shadow: 0 0 0 1.5px #882cd9;
+}
+
+form p {
+  text-align: center;
+  margin-top: 1rem;
+  color: rgb(97, 96, 96);
+}
+
+.auth-link {
+  color: #882cd9;
+  text-decoration: none;
+}
+
+.auth-link:hover {
+  text-decoration: underline;
+}
+
+.auth-link:visited {
+  color: #6322b3;
+}
+
+.auth-link:active {
+  color: #37078b;
+}
