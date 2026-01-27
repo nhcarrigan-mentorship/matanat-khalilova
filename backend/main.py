@@ -7,7 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, EmailStr, field_validator
 
 from auth_utils import create_access_token, verify_access_token
-from database import client, users_collection, phrases_collection
+from database import client, phrases_collection, users_collection
 
 app = FastAPI()
 
