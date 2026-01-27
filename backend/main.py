@@ -7,7 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, EmailStr, field_validator
 
 from auth_utils import create_access_token, verify_access_token
-from database import client, users_collection
+from database import client, users_collection, phrases_collection
 
 app = FastAPI()
 
@@ -165,3 +165,16 @@ async def logout(response: Response):
         secure=False,  # Set to True while using https:// in production
     )
     return {"status": "success", "message": "Logged out successfully"}
+
+
+@app.get("/api/phrases")
+async def get_phrases():
+    phrases_cursor = phrases_collection.find()
+    phrases_list = await phrases_cursor.to_list(length=100).sort(
+        "id", 1
+    )  # Sorts them 1 to 15; also adjust length as needed
+
+    for phrase in phrases_list:
+        phrase["_id"] = str(phrase["_id"])
+
+    return {"status": "success", "count": len(phrases_list), "phrases": phrases_list}

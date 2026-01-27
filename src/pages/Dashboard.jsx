@@ -60,6 +60,9 @@ const Dashboard = () => {
       >
         {loading ? "Logging out..." : "Log Out"}
       </button>
+      <button onClick={() => navigate("/train")} className="train-button">
+        Go to Training Page 🎤
+      </button>
     </div>
   );
 };

@@ -29,6 +29,18 @@ input {
   width: 100%;
   display: block;
   box-sizing: border-box;
+  border-radius: 4px;
+  border-color: #a9a8a8;
+}
+
+input:hover {
+  border-color: #979696;
+  box-shadow: 0 0 0 1.1px #979696;
+}
+
+input:focus {
+  outline: 1px solid #a754f0;
+  box-shadow: 0 0 0 1.1px #a754f0;
 }
 
 button {
@@ -41,6 +53,8 @@ button {
   border-radius: 4px;
   cursor: pointer;
   font-weight: bold;
+  border-radius: 4px;
+  transition: background-color 0.3s ease;
 }
 
 button:hover {
@@ -56,6 +70,11 @@ form p {
   text-align: center;
   margin-top: 1rem;
   color: rgb(97, 96, 96);
+}
+
+form label {
+  margin-bottom: 0.3rem;
+  display: block;
 }
 
 .auth-link {
