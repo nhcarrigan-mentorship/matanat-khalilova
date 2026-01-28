@@ -169,10 +169,10 @@ async def logout(response: Response):
 
 @app.get("/api/phrases")
 async def get_phrases():
-    phrases_cursor = phrases_collection.find()
-    phrases_list = await phrases_cursor.to_list(length=100).sort(
+    phrases_cursor = phrases_collection.find().sort(
         "id", 1
     )  # Sorts them 1 to 15; also adjust length as needed
+    phrases_list = await phrases_cursor.to_list(length=100)
 
     for phrase in phrases_list:
         phrase["_id"] = str(phrase["_id"])

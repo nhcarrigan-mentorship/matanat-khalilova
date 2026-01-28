@@ -3,6 +3,13 @@ import { useState, useEffect } from "react";
 
 const Train = () => {
   const [phrases, setPhrases] = useState(null);
+  const [phraseIndex, setPhraseIndex] = useState(0);
+
+  const handleNext = () => {
+    setPhraseIndex((prevIndex) =>
+      prevIndex + 1 < phrases.length ? prevIndex + 1 : 0,
+    );
+  };
 
   useEffect(() => {
     const fetchPhrases = async () => {
@@ -27,14 +34,14 @@ const Train = () => {
   if (!phrases) {
     return <div>Loading phrases...</div>;
   }
+
   return (
-    <div style={{ padding: "20px", textAlign: "center" }}>
+    <div className="train-container">
       <h1>Training Phrases</h1>
-      <ol>
-        {phrases.map((phrase) => (
-          <li key={phrase.id}>{phrase.text}</li>
-        ))}
-      </ol>
+      <div className="phrase-box">{phrases[phraseIndex].text}</div>
+      <button onClick={handleNext} className="next-button">
+        Next
+      </button>
     </div>
   );
 };
