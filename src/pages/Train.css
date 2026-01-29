@@ -1,0 +1,61 @@
+.instructions {
+  font-size: 1.2rem;
+}
+
+.train-container {
+  min-height: 80vh;
+  padding: 2rem;
+  background-color: #ffffff;
+  margin: 0 auto;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+}
+
+.phrase-box {
+  width: 60vw;
+  height: 40vh;
+  margin: 1.5rem auto;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  padding: 2rem;
+  background-color: #f9f9f9;
+  font-size: 1.5rem;
+  border: 0.15rem solid #ccc;
+  border-radius: 1rem;
+}
+
+.record-button,
+.stop-button,
+.next-button {
+  display: inline-block;
+  margin: 0.8rem 1rem;
+  padding: 0.8rem 1.5rem;
+  font-size: 1rem;
+  width: auto;
+}
+
+.success-message {
+  font-size: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  padding: 2rem;
+  width: 50vw;
+  height: 50vh;
+  background-color: #f9f9f9;
+  border: 0.15rem solid #ccc;
+  border-radius: 1rem;
+}
+
+.dashboard-button {
+  margin-top: 1.5rem;
+  padding: 0.8rem 1.5rem;
+  width: auto;
+  font-weight: bold;
+}
