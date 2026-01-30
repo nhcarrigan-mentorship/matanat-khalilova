@@ -1,6 +1,16 @@
-import React from "react";
+import React, { useRef } from "react";
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import {
+  Mic,
+  Square,
+  ArrowRight,
+  LayoutDashboard,
+  CheckCircle2,
+  FileAudio2,
+  Pause,
+  Play,
+} from "lucide-react";
 import "./Train.css";
 
 const Train = () => {
@@ -8,12 +18,57 @@ const Train = () => {
   const [phraseIndex, setPhraseIndex] = useState(0);
   const [user, setUser] = useState(null);
   const [isFinished, setIsFinished] = useState(false);
+  const [audioURL, setAudioURL] = useState(null);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
+  const mediaRecorderRef = useRef(null);
+  const audioChunksRef = useRef([]);
+  const streamRef = useRef(null);
+  const audioPlayerRef = useRef(null);
   const navigate = useNavigate();
+
+  const togglePlay = () => {
+    // We check if the player exists before trying to use it
+    if (audioPlayerRef.current) {
+      if (isPlaying) {
+        audioPlayerRef.current.pause();
+      } else {
+        audioPlayerRef.current.play();
+      }
+      setIsPlaying(!isPlaying);
+    }
+  };
+
+  const startRecording = async () => {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    streamRef.current = stream;
+    mediaRecorderRef.current = new MediaRecorder(stream);
+    audioChunksRef.current = [];
+    mediaRecorderRef.current.ondataavailable = (event) => {
+      if (event.data.size > 0) {
+        audioChunksRef.current.push(event.data);
+      }
+    };
+    mediaRecorderRef.current.start();
+    setIsRecording(true);
+  };
+
+  const stopRecording = () => {
+    mediaRecorderRef.current.stop();
+    setIsRecording(false);
+    mediaRecorderRef.current.onstop = () => {
+      const audioBlob = new Blob(audioChunksRef.current, { type: "audio/wav" });
+      const url = URL.createObjectURL(audioBlob);
+      setAudioURL(url);
+      streamRef.current.getTracks().forEach((track) => track.stop());
+    };
+  };
 
   const handleNext = () => {
     setPhraseIndex((prevIndex) =>
       prevIndex + 1 < phrases.length ? prevIndex + 1 : 0,
     );
+    setAudioURL(null);
   };
 
   useEffect(() => {
@@ -67,13 +122,18 @@ const Train = () => {
     <div className="train-container" aria-live="polite">
       {isFinished ? (
         <div className="success-message">
-          <h2>Fantastic work, {user ? user.name : "there"}! ✅</h2>
-          <p>You have successfully completed the training session. </p>
+          <div className="icon-celebration">
+            <CheckCircle2 size={77} strokeWidth={1.5} color="#8b5cf6" />
+          </div>
+          <h2>Fantastic work, {user ? user.name : "there"}!</h2>
+          <p>You have successfully completed the training session.</p>
+          <p>All recordings have been saved.</p>
           <button
             onClick={() => navigate("/dashboard")}
             className="dashboard-button"
           >
-            Back to Dashboard
+            <LayoutDashboard size={18} />
+            <span>Back to Dashboard</span>
           </button>
         </div>
       ) : (
@@ -88,15 +148,47 @@ const Train = () => {
             </p>
             <p>{phrases[phraseIndex].text}</p>
           </div>
-          <button className="record-button">Record 🎤</button>
-          <button className="stop-button">Stop ⏹️</button>
+          {audioURL && (
+            <div className="mini-audio-bar">
+              <audio
+                ref={audioPlayerRef}
+                src={audioURL}
+                onEnded={() => setIsPlaying(false)}
+              />
+              ;
+              <div className="audio-info">
+                <FileAudio2 size={16} color="#8b5cf6" />
+                <span>Review Recording {phraseIndex + 1}</span>
+              </div>
+              <button onClick={togglePlay} className="icon-only-playback">
+                {isPlaying ? <Pause size={18} /> : <Play size={18} />}
+              </button>
+            </div>
+          )}
+          {!isRecording ? (
+            <button className="record-button" onClick={startRecording}>
+              <Mic size={18} strokeWidth={2.5} /> Record
+            </button>
+          ) : (
+            <button className="stop-button" onClick={stopRecording}>
+              <Square size={18} fill="currentColor" /> Stop
+            </button>
+          )}
           <button
             onClick={
               phraseIndex === phrases.length - 1 ? handleFinish : handleNext
             }
             className="next-button"
           >
-            {phraseIndex === phrases.length - 1 ? "Finish ✅" : "Next ➡️"}
+            {phraseIndex === phrases.length - 1 ? (
+              <span>
+                Complete <CheckCircle2 size={18} />
+              </span>
+            ) : (
+              <span>
+                Next <ArrowRight size={18} />
+              </span>
+            )}
           </button>
         </div>
       )}
