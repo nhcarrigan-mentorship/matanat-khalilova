@@ -44,6 +44,13 @@
   animation: fadeIn 0.5s ease-out; /* Smooth entrance */
 }
 
+.controls-group {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+}
+
 .record-button,
 .stop-button,
 .next-button,

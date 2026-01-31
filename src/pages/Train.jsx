@@ -126,8 +126,8 @@ const Train = () => {
             <CheckCircle2 size={77} strokeWidth={1.5} color="#8b5cf6" />
           </div>
           <h2>Fantastic work, {user ? user.name : "there"}!</h2>
-          <p>You have successfully completed the training session.</p>
-          <p>All recordings have been saved.</p>
+          <p>Training complete.</p>
+          <p>All recordings saved successfully.</p>
           <button
             onClick={() => navigate("/dashboard")}
             className="dashboard-button"
@@ -165,31 +165,33 @@ const Train = () => {
               </button>
             </div>
           )}
-          {!isRecording ? (
-            <button className="record-button" onClick={startRecording}>
-              <Mic size={18} strokeWidth={2.5} /> Record
-            </button>
-          ) : (
-            <button className="stop-button" onClick={stopRecording}>
-              <Square size={18} fill="currentColor" /> Stop
-            </button>
-          )}
-          <button
-            onClick={
-              phraseIndex === phrases.length - 1 ? handleFinish : handleNext
-            }
-            className="next-button"
-          >
-            {phraseIndex === phrases.length - 1 ? (
-              <span>
-                Complete <CheckCircle2 size={18} />
-              </span>
+          <div className="controls-group">
+            {!isRecording ? (
+              <button className="record-button" onClick={startRecording}>
+                <Mic size={18} strokeWidth={2.5} /> Record
+              </button>
             ) : (
-              <span>
-                Next <ArrowRight size={18} />
-              </span>
+              <button className="stop-button" onClick={stopRecording}>
+                <Square size={18} fill="currentColor" /> Stop
+              </button>
             )}
-          </button>
+            <button
+              onClick={
+                phraseIndex === phrases.length - 1 ? handleFinish : handleNext
+              }
+              className="next-button"
+            >
+              {phraseIndex === phrases.length - 1 ? (
+                <span>
+                  Complete <CheckCircle2 size={18} />
+                </span>
+              ) : (
+                <span>
+                  Next <ArrowRight size={18} />
+                </span>
+              )}
+            </button>
+          </div>
         </div>
       )}
     </div>
