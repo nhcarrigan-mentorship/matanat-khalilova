@@ -1,0 +1,13 @@
+.train-button,
+.logout-button {
+  cursor: pointer;
+  width: auto;
+  margin: 0.8rem 1rem;
+  padding: 0.8rem 1.5rem;
+  font-size: 1rem;
+  font-weight: 500;
+  gap: 0.5rem;
+  border-radius: 0.75rem;
+  border: none;
+  transition: all 0.3s ease;
+}

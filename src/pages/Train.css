@@ -62,7 +62,7 @@
   gap: 0.5rem; /* Space between icon and text */
   border-radius: 0.75rem;
   font-size: 1rem;
-  font-weight: 555;
+  font-weight: 500;
   border: none;
   width: auto;
   transition: all 0.3s ease;
@@ -164,4 +164,15 @@ h2 {
   display: flex;
   align-items: center;
   gap: 0.5rem;
+}
+
+.next-button:disabled {
+  background: #68c76b; /* A faded version of green */
+  cursor: not-allowed;
+  transform: none; /* No lift effect when disabled */
+  box-shadow: none;
+  opacity: 0.7;
+}
+.waveform-container {
+  flex-grow: 1; /* Lets the waves take up the empty space */
 }

@@ -1,6 +1,7 @@
 import React, { useRef } from "react";
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import WaveSurfer from "wavesurfer.js";
 import {
   Mic,
   Square,
@@ -28,7 +29,7 @@ const Train = () => {
   const navigate = useNavigate();
 
   const togglePlay = () => {
-    // We check if the player exists before trying to use it
+    // We check if the player exists prior to trying to use it
     if (audioPlayerRef.current) {
       if (isPlaying) {
         audioPlayerRef.current.pause();
@@ -62,6 +63,34 @@ const Train = () => {
       setAudioURL(url);
       streamRef.current.getTracks().forEach((track) => track.stop());
     };
+  };
+  /*eslint-disable react/prop-types */
+  const WaveformPlayer = ({ url }) => {
+    const containerRef = useRef(null);
+    const waveSurferRef = useRef(null);
+
+    useEffect(() => {
+      // Create the waveform visualizer
+      waveSurferRef.current = WaveSurfer.create({
+        container: containerRef.current,
+        waveColor: "#d1d5db", // Light grey for the "background" waves
+        progressColor: "#8b5cf6", // Your purple for the "played" part
+        cursorColor: "transparent",
+        barWidth: 3, // Makes it look like "bars" (WhatsApp style)
+        barRadius: 3,
+        responsive: true,
+        height: 40,
+        normalize: true, // Makes quiet recordings look better
+      });
+
+      waveSurferRef.current.load(url);
+
+      return () => waveSurferRef.current.destroy();
+    }, [url]);
+
+    return (
+      <div ref={containerRef} style={{ width: "100%", cursor: "pointer" }} />
+    );
   };
 
   const handleNext = () => {
@@ -121,9 +150,14 @@ const Train = () => {
   return (
     <div className="train-container" aria-live="polite">
       {isFinished ? (
-        <div className="success-message">
+        <div className="success-message" role="alert">
           <div className="icon-celebration">
-            <CheckCircle2 size={77} strokeWidth={1.5} color="#8b5cf6" />
+            <CheckCircle2
+              size={77}
+              strokeWidth={1.5}
+              color="#8b5cf6"
+              aria-hidden="true"
+            />
           </div>
           <h2>Fantastic work, {user ? user.name : "there"}!</h2>
           <p>Training complete.</p>
@@ -132,7 +166,7 @@ const Train = () => {
             onClick={() => navigate("/dashboard")}
             className="dashboard-button"
           >
-            <LayoutDashboard size={18} />
+            <LayoutDashboard size={18} aria-hidden="true" />
             <span>Back to Dashboard</span>
           </button>
         </div>
@@ -150,32 +184,43 @@ const Train = () => {
           </div>
           {audioURL && (
             <div className="mini-audio-bar">
-              <audio
-                ref={audioPlayerRef}
-                src={audioURL}
-                onEnded={() => setIsPlaying(false)}
-              />
-              ;
+              <div className="waveform-container">
+                <WaveformPlayer
+                  url={audioURL}
+                  isPlaying={isPlaying}
+                  onFinish={() => setIsPlaying(false)}
+                />
+              </div>
               <div className="audio-info">
-                <FileAudio2 size={16} color="#8b5cf6" />
+                <FileAudio2 size={16} color="#8b5cf6" aria-hidden="true" />
                 <span>Review Recording {phraseIndex + 1}</span>
               </div>
-              <button onClick={togglePlay} className="icon-only-playback">
-                {isPlaying ? <Pause size={18} /> : <Play size={18} />}
+              <button
+                onClick={togglePlay}
+                className="icon-only-playback"
+                aria-label={isPlaying ? "Pause recording" : "Play recording"}
+              >
+                {isPlaying ? (
+                  <Pause size={18} aria-hidden="true" />
+                ) : (
+                  <Play size={18} aria-hidden="true" />
+                )}
               </button>
             </div>
           )}
           <div className="controls-group">
             {!isRecording ? (
               <button className="record-button" onClick={startRecording}>
-                <Mic size={18} strokeWidth={2.5} /> Record
+                <Mic size={18} strokeWidth={2.5} aria-hidden="true" />
+                {audioURL ? "Retry" : "Record"}
               </button>
             ) : (
               <button className="stop-button" onClick={stopRecording}>
-                <Square size={18} fill="currentColor" /> Stop
+                <Square size={18} fill="currentColor" aria-hidden="true" /> Stop
               </button>
             )}
             <button
+              disabled={!audioURL || isRecording}
               onClick={
                 phraseIndex === phrases.length - 1 ? handleFinish : handleNext
               }
@@ -183,11 +228,11 @@ const Train = () => {
             >
               {phraseIndex === phrases.length - 1 ? (
                 <span>
-                  Complete <CheckCircle2 size={18} />
+                  Complete <CheckCircle2 size={18} aria-hidden="true" />
                 </span>
               ) : (
                 <span>
-                  Next <ArrowRight size={18} />
+                  Next <ArrowRight size={18} aria-hidden="true" />
                 </span>
               )}
             </button>
