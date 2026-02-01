@@ -173,6 +173,79 @@ h2 {
   box-shadow: none;
   opacity: 0.7;
 }
-.waveform-container {
-  flex-grow: 1; /* Lets the waves take up the empty space */
+
+.pill-player-container {
+  display: flex;
+  align-items: center;
+  gap: 1rem; /* Space between button and waveform */
+  background-color: #ffffff;
+  border: 0.125rem solid #8b5cf6;
+  padding: 0.5rem 0.75rem;
+  border-radius: 3.125rem;
+  width: 100%;
+  max-width: 21.875rem;
+  margin: 1.5rem auto;
+  box-shadow: 0 0.25rem 0.375rem -0.0625rem rgba(0, 0, 0, 0.1);
+}
+
+.pill-play-button {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #8b5cf6;
+  padding: 0.5rem;
+  transition: transform 0.2s ease;
+  width: auto;
+  outline: none;
+  box-shadow: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.pill-play-button:focus,
+.pill-play-button:active,
+.pill-play-button:hover {
+  outline: none;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.pill-waveform-wrapper {
+  flex-grow: 1; /* Allows it to fill the remaining space */
+  height: 2rem;
+  display: flex;
+  align-items: center;
+}
+
+.phrase-status {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+  font-weight: 500;
+  color: #6b7280; /* Neutral grey */
+}
+
+.current-step {
+  background-color: #374151;
+  color: #ffffff;
+  width: 2.8rem;
+  height: 2.8rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  font-size: 0.875rem;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  border: 4px solid #f3f4f6;
+}
+
+.phrase-text {
+  font-size: 1.5rem;
+  color: #1f2937;
+  line-height: 1.4;
+  font-style: italic;
 }

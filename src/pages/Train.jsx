@@ -25,20 +25,7 @@ const Train = () => {
   const mediaRecorderRef = useRef(null);
   const audioChunksRef = useRef([]);
   const streamRef = useRef(null);
-  const audioPlayerRef = useRef(null);
   const navigate = useNavigate();
-
-  const togglePlay = () => {
-    // We check if the player exists prior to trying to use it
-    if (audioPlayerRef.current) {
-      if (isPlaying) {
-        audioPlayerRef.current.pause();
-      } else {
-        audioPlayerRef.current.play();
-      }
-      setIsPlaying(!isPlaying);
-    }
-  };
 
   const startRecording = async () => {
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -64,29 +51,57 @@ const Train = () => {
       streamRef.current.getTracks().forEach((track) => track.stop());
     };
   };
+
+  const togglePlay = () => {
+    setIsPlaying(!isPlaying);
+  };
+
   /*eslint-disable react/prop-types */
-  const WaveformPlayer = ({ url }) => {
+  const WaveformPlayer = ({ url, isPlaying, onFinish }) => {
     const containerRef = useRef(null);
     const waveSurferRef = useRef(null);
 
     useEffect(() => {
+      if (!containerRef.current) return;
       // Create the waveform visualizer
-      waveSurferRef.current = WaveSurfer.create({
+      const ws = WaveSurfer.create({
         container: containerRef.current,
-        waveColor: "#d1d5db", // Light grey for the "background" waves
-        progressColor: "#8b5cf6", // Your purple for the "played" part
+        waveColor: "#babdc1", // Light grey for the background waves
+        progressColor: "#8b5cf6", // Purple for the played part
         cursorColor: "transparent",
-        barWidth: 3, // Makes it look like "bars" (WhatsApp style)
+        barWidth: 3, // Makes it look like bars
         barRadius: 3,
         responsive: true,
         height: 40,
         normalize: true, // Makes quiet recordings look better
       });
 
-      waveSurferRef.current.load(url);
+      waveSurferRef.current = ws;
+      ws.load(url).catch((err) => {
+        if (err.name !== "AbortError") {
+          console.error("WaveSurfer error:", err); // eslint-disable-line no-console
+        }
+      });
 
-      return () => waveSurferRef.current.destroy();
-    }, [url]);
+      ws.on("finish", () => {
+        onFinish(); // Start listening
+      });
+
+      return () => {
+        ws.un("finish"); // Stop listening (remove the ear)
+        ws.destroy(); // Delete the whole player
+      };
+    }, [url, onFinish]);
+
+    useEffect(() => {
+      if (waveSurferRef.current) {
+        if (isPlaying) {
+          waveSurferRef.current.play();
+        } else {
+          waveSurferRef.current.pause();
+        }
+      }
+    }, [isPlaying]);
 
     return (
       <div ref={containerRef} style={{ width: "100%", cursor: "pointer" }} />
@@ -177,35 +192,45 @@ const Train = () => {
             Record each phrase to personalize your voice model.
           </p>
           <div className="phrase-box">
-            <p>
-              Phrase {phraseIndex + 1} of {phrases.length}
-            </p>
-            <p>{phrases[phraseIndex].text}</p>
+            <div className="phrase-status">
+              <span>Step</span>
+              <span className="current-step">
+                {phraseIndex + 1} / {phrases.length}
+              </span>
+            </div>
+            <p className="phrase-text">{phrases[phraseIndex].text}</p>
           </div>
           {audioURL && (
-            <div className="mini-audio-bar">
-              <div className="waveform-container">
-                <WaveformPlayer
-                  url={audioURL}
-                  isPlaying={isPlaying}
-                  onFinish={() => setIsPlaying(false)}
-                />
-              </div>
+            <div className="audio-player-section">
               <div className="audio-info">
                 <FileAudio2 size={16} color="#8b5cf6" aria-hidden="true" />
-                <span>Review Recording {phraseIndex + 1}</span>
+                <span> Review Recording {phraseIndex + 1}</span>
               </div>
-              <button
-                onClick={togglePlay}
-                className="icon-only-playback"
-                aria-label={isPlaying ? "Pause recording" : "Play recording"}
-              >
-                {isPlaying ? (
-                  <Pause size={18} aria-hidden="true" />
-                ) : (
-                  <Play size={18} aria-hidden="true" />
-                )}
-              </button>
+              <div className="pill-player-container">
+                <button
+                  onClick={togglePlay}
+                  className="pill-play-button"
+                  aria-label={isPlaying ? "Pause recording" : "Play recording"}
+                >
+                  {isPlaying ? (
+                    <Pause size={18} aria-hidden="true" fill="currentColor" />
+                  ) : (
+                    <Play
+                      size={18}
+                      aria-hidden="true"
+                      fill="currentColor"
+                      ml="0.125rem"
+                    />
+                  )}
+                </button>
+                <div className="pill-waveform-wrapper">
+                  <WaveformPlayer
+                    url={audioURL}
+                    isPlaying={isPlaying}
+                    onFinish={() => setIsPlaying(false)}
+                  />
+                </div>
+              </div>
             </div>
           )}
           <div className="controls-group">
