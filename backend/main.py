@@ -1,7 +1,11 @@
+import os
 import re
 
 import bcrypt
+import cloudinary
+import cloudinary.uploader
 from bson import ObjectId
+from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, EmailStr, field_validator
@@ -10,6 +14,18 @@ from auth_utils import create_access_token, verify_access_token
 from database import client, phrases_collection, users_collection
 
 app = FastAPI()
+
+# Load environment variables from .env file
+load_dotenv()
+
+cloudinary.config(
+    cloud_name=os.getenv("CLOUDINARY_CLOUD_NAME"),
+    api_key=os.getenv("CLOUDINARY_API_KEY"),
+    api_secret=os.getenv("CLOUDINARY_API_SECRET"),
+    secure=True,
+)
+
+print(f"Cloudinary Cloud Name: {cloudinary.config().cloud_name}"),
 
 
 @app.get("/")

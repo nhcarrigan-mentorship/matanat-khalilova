@@ -69,11 +69,11 @@ const Train = () => {
         waveColor: "#babdc1", // Light grey for the background waves
         progressColor: "#8b5cf6", // Purple for the played part
         cursorColor: "transparent",
-        barWidth: 3, // Makes it look like bars
+        barWidth: 3, // Make it look like bars
         barRadius: 3,
         responsive: true,
         height: 40,
-        normalize: true, // Makes quiet recordings look better
+        normalize: true, // Make quiet recordings look better
       });
 
       waveSurferRef.current = ws;
@@ -126,13 +126,15 @@ const Train = () => {
 
         if (response.ok) {
           setUser(data.user);
+        } else {
+          navigate("/login");
         }
       } catch (error) {
         console.error("Failed to fetch user data", error); // eslint-disable-line no-console
       }
     };
     fetchUser();
-  }, []);
+  }, [navigate]);
 
   const handleFinish = () => {
     setIsFinished(true);

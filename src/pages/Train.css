@@ -160,6 +160,15 @@ h2 {
   margin: 0.5rem 0;
 }
 
+.success-message h2 {
+  color: #16a34a;
+}
+
+.success-message p {
+  color: #374151;
+  font-size: 1.4rem;
+}
+
 .next-button span {
   display: flex;
   align-items: center;
