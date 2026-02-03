@@ -1,17 +1,27 @@
 import os
 import re
+from datetime import datetime
 
 import bcrypt
 import cloudinary
 import cloudinary.uploader
 from bson import ObjectId
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException, Request, Response
+from fastapi import (
+    Depends,
+    FastAPI,
+    File,
+    Form,
+    HTTPException,
+    Request,
+    Response,
+    UploadFile,
+)
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, EmailStr, field_validator
 
 from auth_utils import create_access_token, verify_access_token
-from database import client, phrases_collection, users_collection
+from database import client, db, phrases_collection, users_collection
 
 app = FastAPI()
 
@@ -24,8 +34,6 @@ cloudinary.config(
     api_secret=os.getenv("CLOUDINARY_API_SECRET"),
     secure=True,
 )
-
-print(f"Cloudinary Cloud Name: {cloudinary.config().cloud_name}"),
 
 
 @app.get("/")
@@ -194,3 +202,33 @@ async def get_phrases():
         phrase["_id"] = str(phrase["_id"])
 
     return {"status": "success", "count": len(phrases_list), "phrases": phrases_list}
+
+
+@app.post("/upload-audio")
+async def upload_audio(
+    file: UploadFile = File(...),
+    phrase_id: str = Form(...),  # Catch the phrase ID from the frontend
+    current_user: dict = Depends(get_current_user),
+):
+    try:
+        # Send to Cloudinary
+        result = cloudinary.uploader.upload(
+            file.file,
+            resource_type="video",
+            folder=f"user_recordings/{current_user['id']}",
+        )
+        audio_url = result.get("secure_url")
+        # Save the link to MONGODB
+        new_sample = {
+            "user_id": current_user["id"],
+            "phrase_id": phrase_id,
+            "audio_url": audio_url,
+            "created_at": datetime.utcnow(),
+        }
+        await db.voice_samples.insert_one(new_sample)
+
+        return {"status": "success", "url": audio_url}
+
+    except Exception as e:
+        print(f"Error: {e}")  # This helps us see what went wrong in the terminal
+        raise HTTPException(status_code=500, detail="Database or Upload failed")

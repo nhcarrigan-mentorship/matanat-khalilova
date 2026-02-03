@@ -52,6 +52,25 @@ const Train = () => {
     };
   };
 
+  const saveToCloudinary = async (audioBlob) => {
+    const formData = new FormData();
+    formData.append("file", audioBlob, "recording.wav");
+    formData.append("phrase_id", phrases[phraseIndex]._id); // Send phrase ID to backend
+    try {
+      const response = await fetch("http://localhost:8000/upload-audio", {
+        method: "POST",
+        body: formData,
+        credentials: "include",
+      });
+      const data = await response.json();
+      console.log("Upload response:", data); // eslint-disable-line no-console
+      return data;
+    } catch (error) {
+      console.error("Upload error:", error); // eslint-disable-line no-console
+      return { status: "error", message: error.message };
+    }
+  };
+
   const togglePlay = () => {
     setIsPlaying(!isPlaying);
   };
@@ -108,11 +127,20 @@ const Train = () => {
     );
   };
 
-  const handleNext = () => {
-    setPhraseIndex((prevIndex) =>
-      prevIndex + 1 < phrases.length ? prevIndex + 1 : 0,
-    );
-    setAudioURL(null);
+  const handleNextAction = async () => {
+    const audioBlob = new Blob(audioChunksRef.current, { type: "audio/wav" });
+    const currentPhraseId = phrases[phraseIndex]._id;
+    const uploadResult = await saveToCloudinary(audioBlob, currentPhraseId);
+    if (uploadResult.status === "success") {
+      if (phraseIndex + 1 === phrases.length) {
+        setIsFinished(true);
+      } else {
+        setPhraseIndex((prev) => prev + 1);
+        setAudioURL(null); // Reset for next phrase
+      }
+    } else {
+      alert("Failed to save audio. Please try again.");
+    }
   };
 
   useEffect(() => {
@@ -135,10 +163,6 @@ const Train = () => {
     };
     fetchUser();
   }, [navigate]);
-
-  const handleFinish = () => {
-    setIsFinished(true);
-  };
 
   useEffect(() => {
     const fetchPhrases = async () => {
@@ -248,9 +272,7 @@ const Train = () => {
             )}
             <button
               disabled={!audioURL || isRecording}
-              onClick={
-                phraseIndex === phrases.length - 1 ? handleFinish : handleNext
-              }
+              onClick={handleNextAction}
               className="next-button"
             >
               {phraseIndex === phrases.length - 1 ? (
