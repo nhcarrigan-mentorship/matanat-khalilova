@@ -9,6 +9,7 @@ import SignupForm from "./components/auth/SignupForm";
 import LoginForm from "./components/auth/LoginForm";
 import Dashboard from "./pages/Dashboard";
 import Train from "./pages/Train";
+import VoiceProfile from "./pages/VoiceProfile";
 
 function App() {
   return (
@@ -20,6 +21,7 @@ function App() {
         <Route path="/login" element={<LoginForm />} />
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/train" element={<Train />} />
+        <Route path="/voice-profile" element={<VoiceProfile />} />
       </Routes>
     </Router>
   );

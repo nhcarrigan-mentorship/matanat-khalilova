@@ -176,6 +176,7 @@ async def get_current_user(request: Request):
             "id": str(user["_id"]),
             "email": user["email"],
             "name": user["name"],
+            "is_trained": user.get("is_trained", False),
         },
     }
 
@@ -204,31 +205,59 @@ async def get_phrases():
     return {"status": "success", "count": len(phrases_list), "phrases": phrases_list}
 
 
-@app.post("/upload-audio")
+@app.post("/api/upload-audio")
 async def upload_audio(
     file: UploadFile = File(...),
     phrase_id: str = Form(...),  # Catch the phrase ID from the frontend
     current_user: dict = Depends(get_current_user),
 ):
     try:
+        actual_user_id = current_user["user"]["id"]
         # Send to Cloudinary
         result = cloudinary.uploader.upload(
             file.file,
             resource_type="video",
-            folder=f"user_recordings/{current_user['id']}",
+            folder=f"user_recordings/{actual_user_id}",
         )
         audio_url = result.get("secure_url")
         # Save the link to MONGODB
         new_sample = {
-            "user_id": current_user["id"],
+            "user_id": actual_user_id,
             "phrase_id": phrase_id,
             "audio_url": audio_url,
             "created_at": datetime.utcnow(),
         }
         await db.voice_samples.insert_one(new_sample)
 
+        if phrase_id == "phrase_15":
+            await users_collection.update_one(
+                {"_id": ObjectId(actual_user_id)},
+                {"$set": {"is_trained": True}},
+            )
+
         return {"status": "success", "url": audio_url}
 
     except Exception as e:
-        print(f"Error: {e}")  # This helps us see what went wrong in the terminal
         raise HTTPException(status_code=500, detail="Database or Upload failed")
+
+
+@app.get("/api/my-recordings")
+async def get_user_recordings(current_user: dict = Depends(get_current_user)):
+    try:
+        # 1. Get the ID of the logged-in user
+        actual_user_id = current_user["user"]["id"]
+
+        # 2. Find all samples where user_id matches
+        # We sort by created_at so they appear in order
+        cursor = db.voice_samples.find({"user_id": actual_user_id}).sort(
+            "created_at", 1
+        )
+        samples = await cursor.to_list(length=100)
+
+        # 3. Clean up MongoDB ObjectIDs for React
+        for sample in samples:
+            sample["_id"] = str(sample["_id"])
+
+        return {"status": "success", "count": len(samples), "recordings": samples}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))

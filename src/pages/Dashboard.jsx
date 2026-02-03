@@ -61,13 +61,33 @@ const Dashboard = () => {
       >
         {loading ? "Logging out..." : "Log Out"}
       </button>
-      <button
-        onClick={() => navigate("/train")}
-        className="train-button"
-        aria-label="Go to Voice Training Page"
-      >
-        Go to Training Page 🎤
-      </button>
+      {!user.is_trained ? (
+        <button
+          onClick={() => navigate("/train")}
+          className="train-button"
+          aria-label="Go to Voice Training Page"
+        >
+          Go to Training Page
+        </button>
+      ) : (
+        <div>
+          <button
+            onClick={() => navigate("/voice-profile")}
+            className="profile-button"
+            style={{
+              marginTop: "10px",
+              padding: "10px 20px",
+              background: "#8b5cf6",
+              color: "white",
+              border: "none",
+              borderRadius: "8px",
+              cursor: "pointer",
+            }}
+          >
+            View My Voice Profile
+          </button>
+        </div>
+      )}
     </div>
   );
 };

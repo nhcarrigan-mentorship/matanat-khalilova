@@ -22,6 +22,7 @@ const Train = () => {
   const [audioURL, setAudioURL] = useState(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const mediaRecorderRef = useRef(null);
   const audioChunksRef = useRef([]);
   const streamRef = useRef(null);
@@ -57,7 +58,7 @@ const Train = () => {
     formData.append("file", audioBlob, "recording.wav");
     formData.append("phrase_id", phrases[phraseIndex]._id); // Send phrase ID to backend
     try {
-      const response = await fetch("http://localhost:8000/upload-audio", {
+      const response = await fetch("http://localhost:8000/api/upload-audio", {
         method: "POST",
         body: formData,
         credentials: "include",
@@ -128,9 +129,11 @@ const Train = () => {
   };
 
   const handleNextAction = async () => {
+    setIsSaving(true);
     const audioBlob = new Blob(audioChunksRef.current, { type: "audio/wav" });
     const currentPhraseId = phrases[phraseIndex]._id;
     const uploadResult = await saveToCloudinary(audioBlob, currentPhraseId);
+    setIsSaving(false);
     if (uploadResult.status === "success") {
       if (phraseIndex + 1 === phrases.length) {
         setIsFinished(true);
@@ -220,7 +223,10 @@ const Train = () => {
           <div className="phrase-box">
             <div className="phrase-status">
               <span>Step</span>
-              <span className="current-step">
+              <span
+                className="current-step"
+                aria-label={`Phrase ${phraseIndex + 1} of ${phrases.length}`}
+              >
                 {phraseIndex + 1} / {phrases.length}
               </span>
             </div>
@@ -261,7 +267,13 @@ const Train = () => {
           )}
           <div className="controls-group">
             {!isRecording ? (
-              <button className="record-button" onClick={startRecording}>
+              <button
+                className="record-button"
+                onClick={startRecording}
+                aria-label={
+                  audioURL ? "Retry recording phrase" : "Start recording phrase"
+                }
+              >
                 <Mic size={18} strokeWidth={2.5} aria-hidden="true" />
                 {audioURL ? "Retry" : "Record"}
               </button>
@@ -271,11 +283,13 @@ const Train = () => {
               </button>
             )}
             <button
-              disabled={!audioURL || isRecording}
+              disabled={!audioURL || isRecording || isSaving}
               onClick={handleNextAction}
               className="next-button"
             >
-              {phraseIndex === phrases.length - 1 ? (
+              {isSaving ? (
+                <span>Saving...</span>
+              ) : phraseIndex === phrases.length - 1 ? (
                 <span>
                   Complete <CheckCircle2 size={18} aria-hidden="true" />
                 </span>
