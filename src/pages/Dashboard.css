@@ -1,5 +1,6 @@
 .train-button,
-.logout-button {
+.logout-button,
+.profile-button {
   cursor: pointer;
   width: auto;
   margin: 0.8rem 1rem;

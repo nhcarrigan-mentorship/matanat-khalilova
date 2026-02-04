@@ -74,15 +74,6 @@ const Dashboard = () => {
           <button
             onClick={() => navigate("/voice-profile")}
             className="profile-button"
-            style={{
-              marginTop: "10px",
-              padding: "10px 20px",
-              background: "#8b5cf6",
-              color: "white",
-              border: "none",
-              borderRadius: "8px",
-              cursor: "pointer",
-            }}
           >
             View My Voice Profile
           </button>

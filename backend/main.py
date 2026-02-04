@@ -7,16 +7,8 @@ import cloudinary
 import cloudinary.uploader
 from bson import ObjectId
 from dotenv import load_dotenv
-from fastapi import (
-    Depends,
-    FastAPI,
-    File,
-    Form,
-    HTTPException,
-    Request,
-    Response,
-    UploadFile,
-)
+from fastapi import (Depends, FastAPI, File, Form, HTTPException, Request,
+                     Response, UploadFile)
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, EmailStr, field_validator
 
@@ -228,8 +220,11 @@ async def upload_audio(
             "created_at": datetime.utcnow(),
         }
         await db.voice_samples.insert_one(new_sample)
+        sample_count = await db.voice_samples.count_documents(
+            {"user_id": actual_user_id}
+        )
 
-        if phrase_id == "phrase_15":
+        if sample_count >= 15:
             await users_collection.update_one(
                 {"_id": ObjectId(actual_user_id)},
                 {"$set": {"is_trained": True}},
@@ -238,7 +233,7 @@ async def upload_audio(
         return {"status": "success", "url": audio_url}
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail="Database or Upload failed")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.get("/api/my-recordings")
