@@ -92,7 +92,19 @@ const VoiceProfile = () => {
       <p>Review your training samples below.</p>
       <div className="recordings-list">
         {recordings.length === 0 ? (
-          <p>No recordings found. Please record your voice samples.</p>
+          <div className="no-recordings-container">
+            <p className="no-recordings-message">
+              No recordings found. It looks like you have not started training
+              yet!
+            </p>
+            <button
+              onClick={() => navigate("/train")}
+              className="train-button-link"
+              aria-label="Go to Voice Training Page"
+            >
+              Go to Training Page
+            </button>
+          </div>
         ) : (
           recordings.map((rec, index) => (
             <div key={rec._id} className="recording-item">
