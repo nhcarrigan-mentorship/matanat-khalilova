@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import "./Dashboard.css";
 
 const Dashboard = () => {
   const [user, setUser] = useState(null);
@@ -60,6 +61,24 @@ const Dashboard = () => {
       >
         {loading ? "Logging out..." : "Log Out"}
       </button>
+      {!user.is_trained ? (
+        <button
+          onClick={() => navigate("/train")}
+          className="train-button"
+          aria-label="Go to Voice Training Page"
+        >
+          Go to Training Page
+        </button>
+      ) : (
+        <div>
+          <button
+            onClick={() => navigate("/voice-profile")}
+            className="profile-button"
+          >
+            View My Voice Profile
+          </button>
+        </div>
+      )}
     </div>
   );
 };

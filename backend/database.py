@@ -17,6 +17,9 @@ db = client.voicebridge_db
 # Create a collection for users
 users_collection = db.users
 
+# Get the phrases collection
+phrases_collection = db.phrases
+
 
 async def check_connection():
     try:

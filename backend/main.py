@@ -1,15 +1,39 @@
+import os
 import re
+from datetime import datetime
 
 import bcrypt
+import cloudinary
+import cloudinary.uploader
 from bson import ObjectId
-from fastapi import FastAPI, HTTPException, Request, Response
+from dotenv import load_dotenv
+from fastapi import (
+    Depends,
+    FastAPI,
+    File,
+    Form,
+    HTTPException,
+    Request,
+    Response,
+    UploadFile,
+)
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, EmailStr, field_validator
 
 from auth_utils import create_access_token, verify_access_token
-from database import client, users_collection
+from database import client, db, phrases_collection, users_collection
 
 app = FastAPI()
+
+# Load environment variables from .env file
+load_dotenv()
+
+cloudinary.config(
+    cloud_name=os.getenv("CLOUDINARY_CLOUD_NAME"),
+    api_key=os.getenv("CLOUDINARY_API_KEY"),
+    api_secret=os.getenv("CLOUDINARY_API_SECRET"),
+    secure=True,
+)
 
 
 @app.get("/")
@@ -152,6 +176,7 @@ async def get_current_user(request: Request):
             "id": str(user["_id"]),
             "email": user["email"],
             "name": user["name"],
+            "is_trained": user.get("is_trained", False),
         },
     }
 
@@ -165,3 +190,77 @@ async def logout(response: Response):
         secure=False,  # Set to True while using https:// in production
     )
     return {"status": "success", "message": "Logged out successfully"}
+
+
+@app.get("/api/phrases")
+async def get_phrases():
+    phrases_cursor = phrases_collection.find().sort(
+        "id", 1
+    )  # Sorts them 1 to 15; also adjust length as needed
+    phrases_list = await phrases_cursor.to_list(length=100)
+
+    for phrase in phrases_list:
+        phrase["_id"] = str(phrase["_id"])
+
+    return {"status": "success", "count": len(phrases_list), "phrases": phrases_list}
+
+
+@app.post("/api/upload-audio")
+async def upload_audio(
+    file: UploadFile = File(...),
+    phrase_id: str = Form(...),  # Catch the phrase ID from the frontend
+    current_user: dict = Depends(get_current_user),
+):
+    try:
+        actual_user_id = current_user["user"]["id"]
+        # Send to Cloudinary
+        result = cloudinary.uploader.upload(
+            file.file,
+            resource_type="video",
+            folder=f"user_recordings/{actual_user_id}",
+        )
+        audio_url = result.get("secure_url")
+        # Save the link to MONGODB
+        new_sample = {
+            "user_id": actual_user_id,
+            "phrase_id": phrase_id,
+            "audio_url": audio_url,
+            "created_at": datetime.utcnow(),
+        }
+        await db.voice_samples.insert_one(new_sample)
+        sample_count = await db.voice_samples.count_documents(
+            {"user_id": actual_user_id}
+        )
+
+        if sample_count >= 15:
+            await users_collection.update_one(
+                {"_id": ObjectId(actual_user_id)},
+                {"$set": {"is_trained": True}},
+            )
+
+        return {"status": "success", "url": audio_url}
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/my-recordings")
+async def get_user_recordings(current_user: dict = Depends(get_current_user)):
+    try:
+        # 1. Get the ID of the logged-in user
+        actual_user_id = current_user["user"]["id"]
+
+        # 2. Find all samples where user_id matches
+        # We sort by created_at so they appear in order
+        cursor = db.voice_samples.find({"user_id": actual_user_id}).sort(
+            "created_at", 1
+        )
+        samples = await cursor.to_list(length=100)
+
+        # 3. Clean up MongoDB ObjectIDs for React
+        for sample in samples:
+            sample["_id"] = str(sample["_id"])
+
+        return {"status": "success", "count": len(samples), "recordings": samples}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
