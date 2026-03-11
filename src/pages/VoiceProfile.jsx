@@ -1,12 +1,14 @@
 import React, { useEffect, useState } from "react";
-import { Play, ArrowLeft, Pause } from "lucide-react";
+import { Play, ArrowLeft, Pause, RotateCcw } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import "./VoiceProfile.css";
+import RecordModal from "../components/voice/RecordModal.jsx";
 
 const VoiceProfile = () => {
   const [recordings, setRecordings] = useState([]);
   const [user, setUser] = useState(null);
   const [isPlaying, setIsPlaying] = useState(null);
+  const [selectedSample, setSelectedSample] = useState(null);
   const navigate = useNavigate();
 
   const handlePlay = (rec) => {
@@ -109,9 +111,10 @@ const VoiceProfile = () => {
           recordings.map((rec, index) => (
             <div key={rec._id} className="recording-item">
               <span>Recording {index + 1}</span>
-              <div>
+              <div className="buttons-list">
                 <button
                   className="play-button"
+                  title="Listen"
                   aria-label={
                     isPlaying === rec._id ? "Pause Recording" : "Play Recording"
                   }
@@ -123,11 +126,25 @@ const VoiceProfile = () => {
                     <Play size={16} aria-hidden="true" />
                   )}
                 </button>
+                <button
+                  className="replay-button"
+                  title="Re-record"
+                  aria-label="Re-record the audio"
+                  onClick={() => setSelectedSample(rec)}
+                >
+                  <RotateCcw size={16} aria-hidden="true" />
+                </button>
               </div>
             </div>
           ))
         )}
       </div>
+      {selectedSample && (
+        <RecordModal
+          sample={selectedSample}
+          onClose={() => setSelectedSample(null)}
+        />
+      )}
     </div>
   );
 };

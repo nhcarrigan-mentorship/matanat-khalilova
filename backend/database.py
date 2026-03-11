@@ -25,6 +25,6 @@ async def check_connection():
     try:
         # The 'ping' command is cheap and confirms the connection is alive
         await client.admin.command("ping")
-        print("✅ Successfully connected to MongoDB Atlas!")
+        print("Successfully connected to MongoDB Atlas!")
     except Exception as e:
-        print(f"❌ Could not connect to MongoDB: {e}")
+        print(f"Could not connect to MongoDB: {e}")

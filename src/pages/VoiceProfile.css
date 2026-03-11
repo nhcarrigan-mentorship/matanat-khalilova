@@ -72,3 +72,14 @@ p {
   background: #f3f0ff;
   border-radius: 1rem;
 }
+
+.buttons-list {
+  display: flex;
+  flex-direction: row;
+  gap: 0.5rem;
+}
+
+.play-button,
+.replay-button {
+  padding: 0.8rem;
+}

@@ -19,3 +19,4 @@ venv/
 # Production builds
 build/
 dist/
+.vscode
