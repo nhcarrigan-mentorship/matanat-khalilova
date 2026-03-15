@@ -9,7 +9,6 @@
   background-color: rgba(0, 0, 0, 0.5);
   width: 100vw;
   height: 100vh;
-  border: 0.2rem solid green;
 }
 
 .modal-content {
@@ -91,7 +90,7 @@
 }
 
 .record-button:hover,
-.save-button:hover {
+.save-button:enabled:hover {
   background: #7c3aed;
   box-shadow: 0 0.375rem 1.25rem rgba(139, 92, 246, 0.45);
 }
@@ -109,4 +108,14 @@
 
 .audio-info {
   font-size: 1.1rem;
+}
+
+.save-button.success:disabled {
+  background-color: #28c261;
+  color: white;
+  opacity: 1;
+  cursor: not-allowed;
+  pointer-events: auto;
+  box-shadow: none;
+  transform: none;
 }

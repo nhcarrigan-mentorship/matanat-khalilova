@@ -63,6 +63,7 @@ const RecordModal = ({ sample, onClose }) => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [audioURL, setAudioURL] = useState(null);
   const [isUpdated, setIsUpdated] = useState(false);
+  const [blob, setBlob] = useState(null);
   const mediaRecorderRef = useRef(null);
   const audioChunksRef = useRef([]);
   const streamRef = useRef(null);
@@ -88,6 +89,7 @@ const RecordModal = ({ sample, onClose }) => {
     setIsRecording(false);
     mediaRecorderRef.current.onstop = () => {
       const audioBlob = new Blob(audioChunksRef.current, { type: "audio/wav" });
+      setBlob(audioBlob);
       const url = URL.createObjectURL(audioBlob);
       setAudioURL(url);
       streamRef.current.getTracks().forEach((track) => track.stop());
@@ -118,14 +120,17 @@ const RecordModal = ({ sample, onClose }) => {
   };
 
   const handleUpdate = async () => {
+    if (isSaving || isUpdated || !blob) return;
     setIsSaving(true);
-    const audioBlob = new Blob(audioChunksRef.current, { type: "audio/wav" });
-    const uploadResult = await saveToCloudinary(audioBlob);
-    setIsSaving(false);
-    if (uploadResult.status !== "error") {
-      setIsUpdated(true);
-    } else {
-      console.error("Error updating the audio sample"); // eslint-disable-line no-console
+    try {
+      const uploadResult = await saveToCloudinary(blob);
+      if (uploadResult.status !== "error") {
+        setIsUpdated(true);
+      }
+    } catch (error) {
+      console.error("Update failed", error); // eslint-disable-line no-console
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -181,7 +186,7 @@ const RecordModal = ({ sample, onClose }) => {
               </div>
             </div>
             <button
-              className="save-button"
+              className={`save-button ${isUpdated ? "success" : ""}`}
               onClick={handleUpdate}
               disabled={isSaving || isUpdated}
             >
