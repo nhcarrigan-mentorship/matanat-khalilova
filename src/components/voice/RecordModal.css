@@ -119,3 +119,11 @@
   box-shadow: none;
   transform: none;
 }
+
+.phrase-text {
+  margin: 2.5rem 0;
+  color: #1f2937 !important;
+  display: block !important;
+  min-height: 0.8rem;
+  background: #f3f4f6;
+}

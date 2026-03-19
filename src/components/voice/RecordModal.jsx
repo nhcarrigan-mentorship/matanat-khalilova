@@ -55,7 +55,7 @@ const WaveformPlayer = ({ url, isPlaying, onFinish }) => {
   );
 };
 
-const RecordModal = ({ sample, onClose }) => {
+const RecordModal = ({ sample, onClose, onUpdateSuccess }) => {
   // eslint-disable-next-line
   console.log("Current Sample Data:", sample);
   const [isRecording, setIsRecording] = useState(false);
@@ -102,7 +102,7 @@ const RecordModal = ({ sample, onClose }) => {
     formData.append("phrase_id", sample._id); // Send phrase ID to backend
     try {
       const response = await fetch("http://localhost:8000/api/upload-audio", {
-        method: "PUT",
+        method: "POST",
         body: formData,
         credentials: "include",
       });
@@ -126,6 +126,9 @@ const RecordModal = ({ sample, onClose }) => {
       const uploadResult = await saveToCloudinary(blob);
       if (uploadResult.status !== "error") {
         setIsUpdated(true);
+        if (onUpdateSuccess) {
+          await onUpdateSuccess();
+        }
       }
     } catch (error) {
       console.error("Update failed", error); // eslint-disable-line no-console
@@ -135,13 +138,15 @@ const RecordModal = ({ sample, onClose }) => {
   };
 
   return (
-    <div className="modal-overlay">
-      <div className="modal-content">
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-content" onClick={(e) => e.stopPropagation()}>
         <button className="close-button" onClick={onClose}>
-          <X />
+          <X size={24} />
         </button>
         <h2>Re-record Sample</h2>
-        <p className="phrase-text">{sample.text}</p>
+        <p className="phrase-text">
+          {sample?.text ? sample.text : "Loading sentence..."}
+        </p>
         <div className="recorder-section">
           {!isRecording ? (
             <button onClick={startRecording} className="record-button">

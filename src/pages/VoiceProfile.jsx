@@ -24,7 +24,8 @@ const VoiceProfile = () => {
     }
 
     // Create a new audio and play
-    const audio = new Audio(rec.audio_url);
+    const freshUrl = `${rec.audio_url}?t=${new Date().getTime()}`;
+    const audio = new Audio(freshUrl);
     window.currentAudio = audio;
     setIsPlaying(rec._id); // Store it globally/locally to control it
 
@@ -57,26 +58,23 @@ const VoiceProfile = () => {
     checkAuth();
   }, [navigate]);
 
-  useEffect(() => {
-    const fetchRecordings = async () => {
-      try {
-        const response = await fetch(
-          "http://localhost:8000/api/my-recordings",
-          {
-            method: "GET",
-            credentials: "include",
-          },
-        );
-        const data = await response.json();
+  const fetchRecordings = async () => {
+    try {
+      const response = await fetch("http://localhost:8000/api/my-recordings", {
+        method: "GET",
+        credentials: "include",
+      });
+      const data = await response.json();
 
-        if (response.ok && data.status === "success") {
-          setRecordings(data.recordings);
-        }
-      } catch (error) {
-        console.error("Error fetching recordings:", error); // eslint-disable-line no-console
+      if (response.ok && data.status === "success") {
+        setRecordings(data.recordings);
       }
-    };
+    } catch (error) {
+      console.error("Error fetching recordings:", error); // eslint-disable-line no-console
+    }
+  };
 
+  useEffect(() => {
     fetchRecordings();
   }, []);
 
@@ -130,7 +128,13 @@ const VoiceProfile = () => {
                   className="replay-button"
                   title="Re-record"
                   aria-label="Re-record the audio"
-                  onClick={() => setSelectedSample(rec)}
+                  onClick={() => {
+                    setSelectedSample({
+                      ...rec,
+                      _id: rec.phrase_id,
+                      text: rec.text,
+                    });
+                  }}
                 >
                   <RotateCcw size={16} aria-hidden="true" />
                 </button>
@@ -143,6 +147,7 @@ const VoiceProfile = () => {
         <RecordModal
           sample={selectedSample}
           onClose={() => setSelectedSample(null)}
+          onUpdateSuccess={fetchRecordings}
         />
       )}
     </div>
