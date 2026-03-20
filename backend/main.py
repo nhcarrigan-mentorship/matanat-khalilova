@@ -218,16 +218,23 @@ async def upload_audio(
             file.file,
             resource_type="video",
             folder=f"user_recordings/{actual_user_id}",
+            public_id=f"phrase_{phrase_id}",
+            overwrite=True,
+            invalidate=True,
         )
         audio_url = result.get("secure_url")
         # Save the link to MONGODB
-        new_sample = {
-            "user_id": actual_user_id,
-            "phrase_id": phrase_id,
-            "audio_url": audio_url,
-            "created_at": datetime.utcnow(),
-        }
-        await db.voice_samples.insert_one(new_sample)
+
+        await db.voice_samples.update_one(
+            {"user_id": actual_user_id, "phrase_id": phrase_id},
+            {
+                "$set": {
+                    "audio_url": audio_url,
+                    "created_at": datetime.utcnow(),
+                }
+            },
+            upsert=True,
+        )
         sample_count = await db.voice_samples.count_documents(
             {"user_id": actual_user_id}
         )
@@ -252,14 +259,41 @@ async def get_user_recordings(current_user: dict = Depends(get_current_user)):
 
         # 2. Find all samples where user_id matches
         # We sort by created_at so they appear in order
-        cursor = db.voice_samples.find({"user_id": actual_user_id}).sort(
-            "created_at", 1
-        )
+        cursor = db.voice_samples.find({"user_id": actual_user_id}).sort("phrase_id", 1)
         samples = await cursor.to_list(length=100)
 
         # 3. Clean up MongoDB ObjectIDs for React
         for sample in samples:
             sample["_id"] = str(sample["_id"])
+            # Get the phrase_id from the sample
+            p_id = sample.get("phrase_id")
+
+            if p_id:
+                try:
+                    # Try to find the phrase using ObjectId
+                    # (using str(p_id) to handle string from database)
+                    phrase_doc = await phrases_collection.find_one(
+                        {"_id": ObjectId(str(p_id))}
+                    )
+
+                    if phrase_doc:
+                        sample["text"] = phrase_doc.get(
+                            "text", "Text field missing in phrase doc"
+                        )
+                    else:
+                        # Fallback: If it's not an ObjectId in the phrases collection,
+                        # try searching a plain string
+                        phrase_doc_alt = await phrases_collection.find_one(
+                            {"_id": str(p_id)}
+                        )
+                        if phrase_doc_alt:
+                            sample["text"] = phrase_doc_alt.get("text")
+                        else:
+                            sample["text"] = f"Phrase {p_id} not found"
+                except Exception as e:
+                    sample["text"] = f"Error matching ID: {str(e)}"
+            else:
+                sample["text"] = "No phrase_id linked"
 
         return {"status": "success", "count": len(samples), "recordings": samples}
     except Exception as e:

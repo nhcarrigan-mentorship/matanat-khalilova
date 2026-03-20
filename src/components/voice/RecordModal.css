@@ -1,0 +1,155 @@
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+  background-color: rgba(0, 0, 0, 0.5);
+  width: 100vw;
+  height: 100vh;
+}
+
+.modal-content {
+  background-color: white;
+  padding: 2.5rem;
+  border-radius: 1.5rem;
+  position: relative;
+  width: 90%;
+  max-width: 31.25rem;
+  box-shadow: 0 1rem 2rem rgba(0, 0, 0, 0.2);
+}
+
+.close-button {
+  position: absolute;
+  height: auto;
+  width: auto;
+  top: 1rem;
+  right: 1rem;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #6b7280;
+  padding: 0.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.2s;
+}
+
+.close-button:hover {
+  color: white;
+  background-color: #7c3aed;
+}
+
+.recorder-section {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin-bottom: 1.5rem;
+  width: 100%;
+}
+
+.record-button,
+.stop-button {
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border-radius: 0.75rem;
+  font-size: 1rem;
+  font-weight: 500;
+  border: none;
+  width: auto;
+  transition: all 0.3s ease;
+  margin: 0.8rem 1rem;
+  padding: 0.8rem 1.5rem;
+}
+
+.save-button {
+  width: 100%; /* Stretch it across the modal */
+  margin-top: 2rem;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.8rem;
+  cursor: pointer;
+  border-radius: 0.75rem;
+  font-size: 1rem;
+  font-weight: 500;
+}
+
+.record-button,
+.save-button {
+  background: #8b5cf6;
+  color: #ffffff;
+  box-shadow: 0 0.25rem 0.875rem 0 rgba(139, 92, 246, 0.39);
+}
+
+.record-button:hover,
+.save-button:enabled:hover {
+  background: #7c3aed;
+  box-shadow: 0 0.375rem 1.25rem rgba(139, 92, 246, 0.45);
+}
+
+.stop-button {
+  background: #ff5f5f;
+  color: #ffffff;
+  box-shadow: 0 0.25rem 0.875rem 0 rgba(239, 68, 68, 0.39);
+}
+
+.stop-button:hover {
+  background: #e53939;
+  box-shadow: 0 0.375rem 1.25rem rgba(239, 68, 68, 0.45);
+}
+
+.audio-info {
+  font-size: 1.1rem;
+}
+
+.save-button.success,
+.save-button.success:disabled {
+  background-color: #28c261;
+  color: white;
+  opacity: 1;
+  cursor: not-allowed;
+  pointer-events: auto;
+  box-shadow: none;
+  transform: none;
+}
+
+.save-button.saving {
+  background-color: #a78bfa;
+  cursor: wait;
+}
+
+.phrase-text {
+  margin: 2.5rem 0;
+  color: #1f2937 !important;
+  display: block !important;
+  min-height: 0.8rem;
+  background: #f3f4f6;
+}
+
+.error-text {
+  color: #e11d48;
+  font-size: 1.1rem;
+  margin-top: 0.7rem;
+  font-weight: 500;
+  text-align: center;
+  animation: fadeIn 0.4s ease-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-5px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

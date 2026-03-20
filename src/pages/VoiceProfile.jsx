@@ -1,12 +1,14 @@
 import React, { useEffect, useState } from "react";
-import { Play, ArrowLeft, Pause } from "lucide-react";
+import { Play, ArrowLeft, Pause, RotateCcw } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import "./VoiceProfile.css";
+import RecordModal from "../components/voice/RecordModal.jsx";
 
 const VoiceProfile = () => {
   const [recordings, setRecordings] = useState([]);
   const [user, setUser] = useState(null);
   const [isPlaying, setIsPlaying] = useState(null);
+  const [selectedSample, setSelectedSample] = useState(null);
   const navigate = useNavigate();
 
   const handlePlay = (rec) => {
@@ -22,7 +24,8 @@ const VoiceProfile = () => {
     }
 
     // Create a new audio and play
-    const audio = new Audio(rec.audio_url);
+    const freshUrl = `${rec.audio_url}?t=${new Date().getTime()}`;
+    const audio = new Audio(freshUrl);
     window.currentAudio = audio;
     setIsPlaying(rec._id); // Store it globally/locally to control it
 
@@ -55,26 +58,23 @@ const VoiceProfile = () => {
     checkAuth();
   }, [navigate]);
 
-  useEffect(() => {
-    const fetchRecordings = async () => {
-      try {
-        const response = await fetch(
-          "http://localhost:8000/api/my-recordings",
-          {
-            method: "GET",
-            credentials: "include",
-          },
-        );
-        const data = await response.json();
+  const fetchRecordings = async () => {
+    try {
+      const response = await fetch("http://localhost:8000/api/my-recordings", {
+        method: "GET",
+        credentials: "include",
+      });
+      const data = await response.json();
 
-        if (response.ok && data.status === "success") {
-          setRecordings(data.recordings);
-        }
-      } catch (error) {
-        console.error("Error fetching recordings:", error); // eslint-disable-line no-console
+      if (response.ok && data.status === "success") {
+        setRecordings(data.recordings);
       }
-    };
+    } catch (error) {
+      console.error("Error fetching recordings:", error); // eslint-disable-line no-console
+    }
+  };
 
+  useEffect(() => {
     fetchRecordings();
   }, []);
 
@@ -89,7 +89,10 @@ const VoiceProfile = () => {
           ? `${user.name}'s Voice Profile 🎙️`
           : "Your Voice Profile 🎙️"}
       </h1>
-      <p>Review your training samples below.</p>
+      <p>
+        Review your samples below or re-record any if you would like to improve
+        the accuracy.
+      </p>
       <div className="recordings-list">
         {recordings.length === 0 ? (
           <div className="no-recordings-container">
@@ -107,11 +110,12 @@ const VoiceProfile = () => {
           </div>
         ) : (
           recordings.map((rec, index) => (
-            <div key={rec._id} className="recording-item">
+            <div key={rec.phrase_id} className="recording-item">
               <span>Recording {index + 1}</span>
-              <div>
+              <div className="buttons-list">
                 <button
                   className="play-button"
+                  title="Listen"
                   aria-label={
                     isPlaying === rec._id ? "Pause Recording" : "Play Recording"
                   }
@@ -123,11 +127,32 @@ const VoiceProfile = () => {
                     <Play size={16} aria-hidden="true" />
                   )}
                 </button>
+                <button
+                  className="replay-button"
+                  title="Re-record"
+                  aria-label="Re-record the audio"
+                  onClick={() => {
+                    setSelectedSample({
+                      ...rec,
+                      _id: rec.phrase_id,
+                      text: rec.text,
+                    });
+                  }}
+                >
+                  <RotateCcw size={16} aria-hidden="true" />
+                </button>
               </div>
             </div>
           ))
         )}
       </div>
+      {selectedSample && (
+        <RecordModal
+          sample={selectedSample}
+          onClose={() => setSelectedSample(null)}
+          onUpdateSuccess={fetchRecordings}
+        />
+      )}
     </div>
   );
 };
