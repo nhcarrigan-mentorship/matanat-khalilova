@@ -7,16 +7,8 @@ import cloudinary
 import cloudinary.uploader
 from bson import ObjectId
 from dotenv import load_dotenv
-from fastapi import (
-    Depends,
-    FastAPI,
-    File,
-    Form,
-    HTTPException,
-    Request,
-    Response,
-    UploadFile,
-)
+from fastapi import (Depends, FastAPI, File, Form, HTTPException, Request,
+                     Response, UploadFile)
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, EmailStr, field_validator
 
@@ -218,6 +210,9 @@ async def upload_audio(
             file.file,
             resource_type="video",
             folder=f"user_recordings/{actual_user_id}",
+            public_id=f"phrase_{phrase_id}",
+            overwrite=True,
+            invalidate=True,
         )
         audio_url = result.get("secure_url")
         # Save the link to MONGODB

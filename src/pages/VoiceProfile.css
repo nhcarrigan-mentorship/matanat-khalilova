@@ -83,3 +83,7 @@ p {
 .replay-button {
   padding: 0.8rem;
 }
+
+.recordings-list {
+  margin-top: 2rem;
+}

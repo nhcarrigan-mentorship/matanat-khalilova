@@ -89,7 +89,10 @@ const VoiceProfile = () => {
           ? `${user.name}'s Voice Profile 🎙️`
           : "Your Voice Profile 🎙️"}
       </h1>
-      <p>Review your training samples below.</p>
+      <p>
+        Review your samples below or re-record any if you would like to improve
+        the accuracy.
+      </p>
       <div className="recordings-list">
         {recordings.length === 0 ? (
           <div className="no-recordings-container">
@@ -107,7 +110,7 @@ const VoiceProfile = () => {
           </div>
         ) : (
           recordings.map((rec, index) => (
-            <div key={rec._id} className="recording-item">
+            <div key={rec.phrase_id} className="recording-item">
               <span>Recording {index + 1}</span>
               <div className="buttons-list">
                 <button

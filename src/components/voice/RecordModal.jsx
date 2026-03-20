@@ -57,13 +57,13 @@ const WaveformPlayer = ({ url, isPlaying, onFinish }) => {
 
 const RecordModal = ({ sample, onClose, onUpdateSuccess }) => {
   // eslint-disable-next-line
-  console.log("Current Sample Data:", sample);
   const [isRecording, setIsRecording] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
   const [audioURL, setAudioURL] = useState(null);
   const [isUpdated, setIsUpdated] = useState(false);
   const [blob, setBlob] = useState(null);
+  const [error, setError] = useState(null);
   const mediaRecorderRef = useRef(null);
   const audioChunksRef = useRef([]);
   const streamRef = useRef(null);
@@ -100,19 +100,16 @@ const RecordModal = ({ sample, onClose, onUpdateSuccess }) => {
     const formData = new FormData();
     formData.append("file", audioBlob, "recording.wav");
     formData.append("phrase_id", sample._id); // Send phrase ID to backend
-    try {
-      const response = await fetch("http://localhost:8000/api/upload-audio", {
-        method: "POST",
-        body: formData,
-        credentials: "include",
-      });
-      const data = await response.json();
-      console.log("Upload response:", data); // eslint-disable-line no-console
-      return data;
-    } catch (error) {
-      console.error("Upload error:", error); // eslint-disable-line no-console
-      return { status: "error", message: error.message };
+
+    const response = await fetch("http://localhost:8000/api/upload-audio", {
+      method: "POST",
+      body: formData,
+      credentials: "include",
+    });
+    if (!response.ok) {
+      throw new Error(`Server responded with ${response.status}`);
     }
+    return await response.json();
   };
 
   const togglePlay = () => {
@@ -122,16 +119,22 @@ const RecordModal = ({ sample, onClose, onUpdateSuccess }) => {
   const handleUpdate = async () => {
     if (isSaving || isUpdated || !blob) return;
     setIsSaving(true);
+    setError(null); // Clear old errors
     try {
       const uploadResult = await saveToCloudinary(blob);
-      if (uploadResult.status !== "error") {
-        setIsUpdated(true);
+      if (uploadResult && uploadResult.status === "success") {
         if (onUpdateSuccess) {
           await onUpdateSuccess();
         }
+        setIsUpdated(true);
+      } else {
+        setError(uploadResult?.message || "Server error. Please try again.");
       }
     } catch (error) {
       console.error("Update failed", error); // eslint-disable-line no-console
+      setError(
+        "Upload failed. Please check your internet connection and try again.",
+      );
     } finally {
       setIsSaving(false);
     }
@@ -191,7 +194,7 @@ const RecordModal = ({ sample, onClose, onUpdateSuccess }) => {
               </div>
             </div>
             <button
-              className={`save-button ${isUpdated ? "success" : ""}`}
+              className={`save-button ${isSaving ? "saving" : ""} ${isUpdated ? "success" : ""}`}
               onClick={handleUpdate}
               disabled={isSaving || isUpdated}
             >
@@ -204,6 +207,7 @@ const RecordModal = ({ sample, onClose, onUpdateSuccess }) => {
             </button>
           </div>
         )}
+        {error && <p className="error-text">{error}</p>}
       </div>
     </div>
   );
