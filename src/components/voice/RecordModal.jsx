@@ -67,8 +67,31 @@ const RecordModal = ({ sample, onClose, onUpdateSuccess }) => {
   const mediaRecorderRef = useRef(null);
   const audioChunksRef = useRef([]);
   const streamRef = useRef(null);
+  const recordingStartTimeRef = useRef(null);
+
+  const checkIsSilent = async (blob) => {
+    const arrayBuffer = await blob.arrayBuffer();
+    const audioContext = new (
+      window.AudioContext || window.webkitAudioContext
+    )();
+    const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+    const rawData = audioBuffer.getChannelData(0); // Get audio channel data
+
+    let maxAmplitude = 0;
+    for (let i = 0; i < rawData.length; i++) {
+      if (Math.abs(rawData[i]) > maxAmplitude) {
+        maxAmplitude = Math.abs(rawData[i]);
+      }
+    }
+
+    await audioContext.close();
+    // If the loudest point is less than 0.01 (1%), it's basically silent
+    return maxAmplitude < 0.01;
+  };
 
   const startRecording = async () => {
+    setError(null); // Clear errors when starting fresh
+    recordingStartTimeRef.current = Date.now();
     setIsUpdated(false);
     setAudioURL(null);
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -85,15 +108,42 @@ const RecordModal = ({ sample, onClose, onUpdateSuccess }) => {
   };
 
   const stopRecording = () => {
-    mediaRecorderRef.current.stop();
-    setIsRecording(false);
-    mediaRecorderRef.current.onstop = () => {
+    const startTime = recordingStartTimeRef.current;
+    const duration = Date.now() - startTime;
+
+    mediaRecorderRef.current.onstop = async () => {
       const audioBlob = new Blob(audioChunksRef.current, { type: "audio/wav" });
+      if (duration < 1500) {
+        setError("Recording was too short, please speak the full phrase");
+        setAudioURL(null);
+        setBlob(null);
+        setIsRecording(false);
+        return;
+      }
+
+      const isSilent = await checkIsSilent(audioBlob);
+      if (isSilent) {
+        setError("We didn't detect any speech, please try again");
+        setAudioURL(null);
+        setBlob(null);
+        setIsRecording(false);
+        return;
+      }
+      setError(null);
       setBlob(audioBlob);
       const url = URL.createObjectURL(audioBlob);
       setAudioURL(url);
-      streamRef.current.getTracks().forEach((track) => track.stop());
+      setIsRecording(false);
     };
+
+    // Stop tracks first
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((track) => track.stop());
+    }
+
+    // this triggers onstop
+    mediaRecorderRef.current.stop();
+    setIsRecording(false);
   };
 
   const saveToCloudinary = async (audioBlob) => {
