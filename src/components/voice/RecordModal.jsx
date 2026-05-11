@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { Mic, Square, X, Play, Pause, Save, FileAudio2 } from "lucide-react";
 import WaveSurfer from "wavesurfer.js";
 import "./RecordModal.css";
+import { validateAudio } from "../../utils/audioValidation";
 
 /*eslint-disable react/prop-types */
 const WaveformPlayer = ({ url, isPlaying, onFinish }) => {
@@ -69,26 +70,6 @@ const RecordModal = ({ sample, onClose, onUpdateSuccess }) => {
   const streamRef = useRef(null);
   const recordingStartTimeRef = useRef(null);
 
-  const checkIsSilent = async (blob) => {
-    const arrayBuffer = await blob.arrayBuffer();
-    const audioContext = new (
-      window.AudioContext || window.webkitAudioContext
-    )();
-    const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
-    const rawData = audioBuffer.getChannelData(0); // Get audio channel data
-
-    let maxAmplitude = 0;
-    for (let i = 0; i < rawData.length; i++) {
-      if (Math.abs(rawData[i]) > maxAmplitude) {
-        maxAmplitude = Math.abs(rawData[i]);
-      }
-    }
-
-    await audioContext.close();
-    // If the loudest point is less than 0.01 (1%), it's basically silent
-    return maxAmplitude < 0.01;
-  };
-
   const startRecording = async () => {
     setError(null); // Clear errors when starting fresh
     recordingStartTimeRef.current = Date.now();
@@ -113,22 +94,16 @@ const RecordModal = ({ sample, onClose, onUpdateSuccess }) => {
 
     mediaRecorderRef.current.onstop = async () => {
       const audioBlob = new Blob(audioChunksRef.current, { type: "audio/wav" });
-      if (duration < 1500) {
-        setError("Recording was too short, please speak the full phrase");
+
+      const { isValid, error } = await validateAudio(audioBlob, duration);
+      if (!isValid) {
+        setError(error);
         setAudioURL(null);
         setBlob(null);
         setIsRecording(false);
         return;
       }
 
-      const isSilent = await checkIsSilent(audioBlob);
-      if (isSilent) {
-        setError("We didn't detect any speech, please try again");
-        setAudioURL(null);
-        setBlob(null);
-        setIsRecording(false);
-        return;
-      }
       setError(null);
       setBlob(audioBlob);
       const url = URL.createObjectURL(audioBlob);
