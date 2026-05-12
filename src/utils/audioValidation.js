@@ -19,7 +19,6 @@ export const checkIsSilent = async (blob) => {
     return maxAmplitude < 0.01;
   } catch (error) {
     console.error("Audio decoding failed:", error); // eslint-disable-line no-console
-
     return true; // Treat decoding errors as silent
   } finally {
     await audioContext.close();

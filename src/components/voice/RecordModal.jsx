@@ -89,6 +89,8 @@ const RecordModal = ({ sample, onClose, onUpdateSuccess }) => {
   };
 
   const stopRecording = () => {
+    setIsRecording(false); // immediately update UI to show we stopped
+
     const startTime = recordingStartTimeRef.current;
     const duration = Date.now() - startTime;
 
@@ -100,7 +102,6 @@ const RecordModal = ({ sample, onClose, onUpdateSuccess }) => {
         setError(error);
         setAudioURL(null);
         setBlob(null);
-        setIsRecording(false);
         return;
       }
 
@@ -108,7 +109,6 @@ const RecordModal = ({ sample, onClose, onUpdateSuccess }) => {
       setBlob(audioBlob);
       const url = URL.createObjectURL(audioBlob);
       setAudioURL(url);
-      setIsRecording(false);
     };
 
     // Stop tracks first
@@ -118,7 +118,6 @@ const RecordModal = ({ sample, onClose, onUpdateSuccess }) => {
 
     // this triggers onstop
     mediaRecorderRef.current.stop();
-    setIsRecording(false);
   };
 
   const saveToCloudinary = async (audioBlob) => {
