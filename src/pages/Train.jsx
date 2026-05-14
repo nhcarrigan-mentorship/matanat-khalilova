@@ -13,6 +13,7 @@ import {
   Play,
 } from "lucide-react";
 import "./Train.css";
+import { validateAudio } from "../utils/audioValidation";
 
 const Train = () => {
   const [phrases, setPhrases] = useState(null);
@@ -23,12 +24,16 @@ const Train = () => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [blob, setBlob] = useState(null);
+  const [error, setError] = useState(null);
   const mediaRecorderRef = useRef(null);
   const audioChunksRef = useRef([]);
   const streamRef = useRef(null);
   const navigate = useNavigate();
+  const recordingStartTimeRef = useRef(null);
 
   const startRecording = async () => {
+    recordingStartTimeRef.current = Date.now();
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
     streamRef.current = stream;
     mediaRecorderRef.current = new MediaRecorder(stream);
@@ -43,14 +48,32 @@ const Train = () => {
   };
 
   const stopRecording = () => {
+    const startTime = recordingStartTimeRef.current;
+    const duration = Date.now() - startTime;
+
+    mediaRecorderRef.current.onstop = async () => {
+      const audioBlob = new Blob(audioChunksRef.current, { type: "audio/wav" });
+
+      const { isValid, error: validationError } = await validateAudio(
+        audioBlob,
+        duration,
+      );
+      if (!isValid) {
+        setError(validationError);
+        setAudioURL(null);
+        setBlob(null);
+        return;
+      }
+      setError(null);
+      setBlob(audioBlob);
+      setAudioURL(URL.createObjectURL(audioBlob));
+
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach((track) => track.stop());
+      }
+    };
     mediaRecorderRef.current.stop();
     setIsRecording(false);
-    mediaRecorderRef.current.onstop = () => {
-      const audioBlob = new Blob(audioChunksRef.current, { type: "audio/wav" });
-      const url = URL.createObjectURL(audioBlob);
-      setAudioURL(url);
-      streamRef.current.getTracks().forEach((track) => track.stop());
-    };
   };
 
   const saveToCloudinary = async (audioBlob) => {
@@ -129,17 +152,19 @@ const Train = () => {
   };
 
   const handleNextAction = async () => {
+    if (!blob) return;
     setIsSaving(true);
-    const audioBlob = new Blob(audioChunksRef.current, { type: "audio/wav" });
-    const currentPhraseId = phrases[phraseIndex]._id;
-    const uploadResult = await saveToCloudinary(audioBlob, currentPhraseId);
+
+    const uploadResult = await saveToCloudinary(blob);
+
     setIsSaving(false);
     if (uploadResult.status === "success") {
       if (phraseIndex + 1 === phrases.length) {
         setIsFinished(true);
       } else {
         setPhraseIndex((prev) => prev + 1);
-        setAudioURL(null); // Reset for next phrase
+        setAudioURL(null);
+        setBlob(null); // Reset for next phrase
       }
     } else {
       alert("Failed to save audio. Please try again.");
@@ -264,6 +289,11 @@ const Train = () => {
                 </div>
               </div>
             </div>
+          )}
+          {error && (
+            <p className="error-message" style={{ color: "red" }}>
+              {error}
+            </p>
           )}
           <div className="controls-group">
             {!isRecording ? (

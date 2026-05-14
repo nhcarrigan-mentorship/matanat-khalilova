@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { Mic, Square, X, Play, Pause, Save, FileAudio2 } from "lucide-react";
 import WaveSurfer from "wavesurfer.js";
 import "./RecordModal.css";
+import { validateAudio } from "../../utils/audioValidation";
 
 /*eslint-disable react/prop-types */
 const WaveformPlayer = ({ url, isPlaying, onFinish }) => {
@@ -67,8 +68,11 @@ const RecordModal = ({ sample, onClose, onUpdateSuccess }) => {
   const mediaRecorderRef = useRef(null);
   const audioChunksRef = useRef([]);
   const streamRef = useRef(null);
+  const recordingStartTimeRef = useRef(null);
 
   const startRecording = async () => {
+    setError(null); // Clear errors when starting fresh
+    recordingStartTimeRef.current = Date.now();
     setIsUpdated(false);
     setAudioURL(null);
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -85,15 +89,35 @@ const RecordModal = ({ sample, onClose, onUpdateSuccess }) => {
   };
 
   const stopRecording = () => {
-    mediaRecorderRef.current.stop();
-    setIsRecording(false);
-    mediaRecorderRef.current.onstop = () => {
+    setIsRecording(false); // immediately update UI to show we stopped
+
+    const startTime = recordingStartTimeRef.current;
+    const duration = Date.now() - startTime;
+
+    mediaRecorderRef.current.onstop = async () => {
       const audioBlob = new Blob(audioChunksRef.current, { type: "audio/wav" });
+
+      const { isValid, error } = await validateAudio(audioBlob, duration);
+      if (!isValid) {
+        setError(error);
+        setAudioURL(null);
+        setBlob(null);
+        return;
+      }
+
+      setError(null);
       setBlob(audioBlob);
       const url = URL.createObjectURL(audioBlob);
       setAudioURL(url);
-      streamRef.current.getTracks().forEach((track) => track.stop());
     };
+
+    // Stop tracks first
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((track) => track.stop());
+    }
+
+    // this triggers onstop
+    mediaRecorderRef.current.stop();
   };
 
   const saveToCloudinary = async (audioBlob) => {

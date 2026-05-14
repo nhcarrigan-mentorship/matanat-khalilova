@@ -213,6 +213,17 @@ async def upload_audio(
 ):
     try:
         actual_user_id = current_user["user"]["id"]
+
+        # Basic server-side validation (size check)
+        # Ensure the file is not effectively empty
+        file_content = await file.read()
+        if len(file_content) < 1000:
+            return {
+                "status": "error",
+                "message": "Uploaded file is too small or empty. Please try again.",
+            }
+        # Reset file pointer after reading for Cloudinary
+        file.file.seek(0)
         # Send to Cloudinary
         result = cloudinary.uploader.upload(
             file.file,
@@ -230,13 +241,15 @@ async def upload_audio(
             {
                 "$set": {
                     "audio_url": audio_url,
+                    "is_validated": True,
+                    "validation_error": None,
                     "created_at": datetime.utcnow(),
                 }
             },
             upsert=True,
         )
         sample_count = await db.voice_samples.count_documents(
-            {"user_id": actual_user_id}
+            {"user_id": actual_user_id, "is_validated": True}
         )
 
         if sample_count >= 15:
@@ -245,7 +258,7 @@ async def upload_audio(
                 {"$set": {"is_trained": True}},
             )
 
-        return {"status": "success", "url": audio_url}
+        return {"status": "success", "url": audio_url, "count": sample_count}
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
