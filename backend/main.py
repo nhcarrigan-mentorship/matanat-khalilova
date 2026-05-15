@@ -99,6 +99,10 @@ async def signup(user: UserSignup, response: Response):
         "name": user.name,
         "email": user.email,
         "password": hashed_password,  # Save the hash, not the plain text password
+        "is_trained": False,
+        "is_optimized": False,
+        "correction_prompt": "",
+        "correction_map": {},
     }
 
     # 4. Save to MongoDB
@@ -176,7 +180,16 @@ async def get_current_user(request: Request):
             "id": str(user["_id"]),
             "email": user["email"],
             "name": user["name"],
-            "is_trained": user.get("is_trained", False),
+            "is_trained": user.get(
+                "is_trained", False
+            ),  # 15/15 sample recorded and validated
+            "is_optimized": user.get("is_optimized", False),  # Whisper patterns mapped
+            "correction_prompt": user.get(
+                "correction_prompt", ""
+            ),  # The generated correction prompt for Whisper
+            "correction_map": user.get(
+                "correction_map", {}
+            ),  # The generated correction map for Whisper
         },
     }
 
@@ -309,5 +322,22 @@ async def get_user_recordings(current_user: dict = Depends(get_current_user)):
                 sample["text"] = "No phrase_id linked"
 
         return {"status": "success", "count": len(samples), "recordings": samples}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/train-profile")
+async def train_profile(current_user: dict = Depends(get_current_user)):
+    try:
+        # actual_user_id = current_user["user"]["id"]
+
+        # 1. TODO: Fetch all 15 validated samples from MongoDB
+        # 2. TODO: Loop through samples and send to Whisper
+        # 3. TODO: Generate the correction map
+
+        return {
+            "status": "processing",
+            "message": "Training started! Patterns are being mapped.",
+        }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
