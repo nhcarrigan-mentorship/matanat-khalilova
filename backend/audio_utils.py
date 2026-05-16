@@ -1,4 +1,5 @@
 import os
+
 from groq import Groq
 
 # Initialize the Groq client using your environment variable
