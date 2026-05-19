@@ -2,6 +2,7 @@ import os
 import re
 
 import httpx
+from bson import ObjectId
 from groq import Groq
 
 from database import db
@@ -45,7 +46,7 @@ async def process_voice_profile_training(user_id: str) -> dict:
     1. Fetches all 15 validated voice samples for the user.
     2. Downloads their raw audio files from Cloudinary.
     3. Transcribes them with Groq Whisper.
-    4. Compares 'text' vs 'whisper_text' to build a correction prompt.
+    4. Compares 'text' ('original_text') vs 'whisper_text' to build a correction prompt.
     """
     # 1: Fetch all validated samples for this user
     cursor = db.voice_samples.find({"user_id": user_id, "is_validated": True})
@@ -62,7 +63,16 @@ async def process_voice_profile_training(user_id: str) -> dict:
     """
     async with httpx.AsyncClient() as client:
         for sample in samples:
-            original_text = sample.get("text")
+            phrase_doc = await db.phrases.find_one(
+                {"_id": ObjectId(sample.get("phrase_id"))}
+            )
+            original_text = phrase_doc.get("text") if phrase_doc else ""
+            if not original_text:
+                print(
+                    f"Warning: No matching phrase text found for phrase_id "
+                    f"{sample.get('phrase_id')}"
+                )
+                continue
             audio_url = sample.get("audio_url")
 
             if not audio_url:
@@ -102,7 +112,7 @@ async def process_voice_profile_training(user_id: str) -> dict:
     )
     correction_prompt = (
         f"The user has dysarthric speech patterns. "
-        f"Apply these exact word substitutions: {map_str}"
+        f"Apply these exact word substitutions to every transcription: {map_str}"
         if map_str
         else ""
     )

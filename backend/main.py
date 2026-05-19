@@ -20,7 +20,7 @@ from fastapi import (
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, EmailStr, field_validator
 
-# from audio_utils import process_voice_profile_training
+from audio_utils import process_voice_profile_training
 from auth_utils import create_access_token, verify_access_token
 from database import client, db, phrases_collection, users_collection
 
@@ -330,12 +330,38 @@ async def get_user_recordings(current_user: dict = Depends(get_current_user)):
 @app.post("/api/train-profile")
 async def train_profile(current_user: dict = Depends(get_current_user)):
     try:
+        # The logged-in user's ID
+        actual_user_id = current_user["user"]["id"]
 
-        # actual_user_id = current_user["user"]["id"]
+        """Running the Cloudinary download -> Groq Whisper transcription
+        to generate the correction maps"""
+        training_results = await process_voice_profile_training(actual_user_id)
 
+        # Updating the user's profile documents with the new AI mappings
+        await db.users.update_one(
+            {"_id": ObjectId(actual_user_id)},
+            {
+                "$set": {
+                    "correction_map": training_results["correction_map"],
+                    "correction_prompt": training_results["correction_prompt"],
+                    "is_optimized": True,
+                }
+            },
+        )
+        # Return the training results to the frontend to update the UI accordingly
         return {
-            "status": "processing",
-            "message": "Training started! Patterns are being mapped.",
+            "status": "success",
+            "message": "Voice profile training completed successfully!",
+            "data": {
+                "is_optimized": True,
+                "mapped_words_count": len(training_results["correction_map"]),
+            },
         }
+    except ValueError as val_err:
+        # Catches the specific "No validated samples found for this user." error
+        raise HTTPException(status_code=400, detail=str(val_err))
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        print(f"Error during profile training endpoint execution: {e}")
+        raise HTTPException(
+            status_code=500, detail="Internal server error during profile training."
+        )
