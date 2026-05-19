@@ -20,6 +20,7 @@ from fastapi import (
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, EmailStr, field_validator
 
+# from audio_utils import process_voice_profile_training
 from auth_utils import create_access_token, verify_access_token
 from database import client, db, phrases_collection, users_collection
 
@@ -329,11 +330,8 @@ async def get_user_recordings(current_user: dict = Depends(get_current_user)):
 @app.post("/api/train-profile")
 async def train_profile(current_user: dict = Depends(get_current_user)):
     try:
-        # actual_user_id = current_user["user"]["id"]
 
-        # 1. TODO: Fetch all 15 validated samples from MongoDB
-        # 2. TODO: Loop through samples and send to Whisper
-        # 3. TODO: Generate the correction map
+        # actual_user_id = current_user["user"]["id"]
 
         return {
             "status": "processing",
