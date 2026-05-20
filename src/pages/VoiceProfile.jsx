@@ -1,5 +1,12 @@
 import React, { useEffect, useState } from "react";
-import { Play, ArrowLeft, Pause, RotateCcw } from "lucide-react";
+import {
+  Play,
+  ArrowLeft,
+  Pause,
+  RotateCcw,
+  Loader2,
+  CheckCircle,
+} from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import "./VoiceProfile.css";
 import RecordModal from "../components/voice/RecordModal.jsx";
@@ -9,6 +16,8 @@ const VoiceProfile = () => {
   const [user, setUser] = useState(null);
   const [isPlaying, setIsPlaying] = useState(null);
   const [selectedSample, setSelectedSample] = useState(null);
+  const [isOptimized, setIsOptimized] = useState(false);
+  const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
   const handlePlay = (rec) => {
@@ -78,6 +87,28 @@ const VoiceProfile = () => {
     fetchRecordings();
   }, []);
 
+  const handleTrainProfile = async () => {
+    if (recordings.length < 15) return; // Safeguard client-side
+
+    setIsPlaying(null); // Stop any playing audio
+    window.currentAudio?.pause();
+    setLoading(true);
+    try {
+      const response = await fetch("http://localhost:8000/api/train-profile", {
+        method: "POST",
+        credentials: "include",
+      });
+      const data = await response.json();
+      if (data.status === "success") {
+        setIsOptimized(true);
+      }
+    } catch (error) {
+      console.error("Error training voice profile:", error); // eslint-disable-line no-console
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="profile-container" style={{ padding: "40px" }}>
       <button onClick={() => navigate("/dashboard")} className="back-link">
@@ -93,6 +124,19 @@ const VoiceProfile = () => {
         Review your samples below or re-record any if you would like to improve
         the accuracy.
       </p>
+      {/* UI Success Status Notification */}
+      {isOptimized && (
+        <div className="optimization-banner">
+          <CheckCircle size={24} />
+          <div>
+            <strong>Profile Fully Optimized!</strong>
+            <p className="optimization-banner-text">
+              Voice Bridge has calibrated its speech recognition models to your
+              unique vocal profile.
+            </p>
+          </div>
+        </div>
+      )}
       <div className="recordings-list">
         {recordings.length === 0 ? (
           <div className="no-recordings-container">
@@ -152,6 +196,36 @@ const VoiceProfile = () => {
           onClose={() => setSelectedSample(null)}
           onUpdateSuccess={fetchRecordings}
         />
+      )}
+      <button
+        className="train-button"
+        onClick={handleTrainProfile}
+        disabled={loading || recordings.length < 15}
+        style={{
+          opacity: loading || recordings.length < 15 ? 0.6 : 1,
+          cursor: loading || recordings.length < 15 ? "not-allowed" : "pointer",
+          display: "flex",
+          alignItems: "center",
+          gap: "8px",
+        }}
+      >
+        {loading ? (
+          <>
+            <Loader2 size={18} className="animate-spin" aria-hidden="true" />
+            Training in Progress...
+          </>
+        ) : isOptimized ? (
+          "Retrain My Voice"
+        ) : (
+          "Train My Voice"
+        )}
+      </button>
+
+      {recordings.length < 15 && (
+        <p style={{ color: "#ef4444", fontSize: "14px", marginTop: "8px" }}>
+          * You need exactly 15 recordings to unlock profile training. (Current:{" "}
+          {recordings.length}/15)
+        </p>
       )}
     </div>
   );

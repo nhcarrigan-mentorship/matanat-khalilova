@@ -13,12 +13,12 @@
   align-items: center;
   justify-content: center;
   background: none;
-  color: #bf94e5;
+  color: #9e3ef3;
 }
 
 .back-link:hover {
   background: #f3eaff;
-  color: #a754f0;
+  color: #7c3aed;
 }
 
 .profile-container {
@@ -86,4 +86,32 @@ p {
 
 .recordings-list {
   margin-top: 2rem;
+}
+
+.optimization-banner {
+  display: "flex";
+  align-items: "center";
+  display: "flex";
+  flex-direction: "column";
+  gap: "10px";
+  background: "#f0fdf4";
+  border: "1px solid #bbf7d0";
+  padding: "16px";
+  border-radius: "8px";
+  margin: "20px 0";
+  color: "#16a34a";
+}
+
+.optimization-banner-text {
+  margin: 0;
+  font-size: "14px";
+  color: "#15803d";
+}
+
+.train-button {
+  margin: 2rem auto;
+  display: block;
+  padding: 0.8rem 1.5rem;
+  background-color: #7c3aed;
+  color: white;
 }
