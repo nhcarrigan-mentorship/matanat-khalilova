@@ -13,10 +13,10 @@ body {
 
 form {
   width: 100%;
-  max-width: 320px;
+  max-width: 20rem;
   padding: 2rem;
   border: 1px solid #ddd;
-  border-radius: 8px;
+  border-radius: 0.5rem;
 }
 
 form h2 {
@@ -29,7 +29,7 @@ input {
   width: 100%;
   display: block;
   box-sizing: border-box;
-  border-radius: 4px;
+  border-radius: 0.25rem;
   border-color: #a9a8a8;
 }
 
@@ -47,23 +47,23 @@ button {
   margin-top: 0.5rem;
   height: 2.6rem;
   width: 100%;
-  background-color: #bf94e5;
+  background-color: #7c3aed;
   color: white;
   border: none;
-  border-radius: 4px;
+  border-radius: 0.25rem;
   cursor: pointer;
   font-weight: bold;
-  border-radius: 4px;
+  border-radius: 0.25rem;
   transition: background-color 0.3s ease;
 }
 
 button:hover {
-  background-color: #a678d1;
+  background-color: #6d28d9;
 }
 
 button:focus {
-  outline: 1px solid #882cd9;
-  box-shadow: 0 0 0 1.5px #882cd9;
+  outline: 1px solid #6d28d9;
+  box-shadow: 0 0 0 1.5px #6d28d9;
 }
 
 form p {

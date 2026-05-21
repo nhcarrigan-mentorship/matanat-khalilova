@@ -110,7 +110,7 @@ const VoiceProfile = () => {
   };
 
   return (
-    <div className="profile-container" style={{ padding: "40px" }}>
+    <div className="profile-container" style={{ padding: "2.5rem" }}>
       <button onClick={() => navigate("/dashboard")} className="back-link">
         <ArrowLeft size={18} aria-hidden="true" /> Back to Dashboard
       </button>
@@ -125,18 +125,22 @@ const VoiceProfile = () => {
         the accuracy.
       </p>
       {/* UI Success Status Notification */}
-      {isOptimized && (
-        <div className="optimization-banner">
-          <CheckCircle size={24} />
-          <div>
-            <strong>Profile Fully Optimized!</strong>
-            <p className="optimization-banner-text">
-              Voice Bridge has calibrated its speech recognition models to your
-              unique vocal profile.
-            </p>
+      {/* This wrapper stays in the DOM so assistive tech is always listening for updates */}
+      <div aria-live="polite" aria-atomic="true">
+        {isOptimized && (
+          <div className="optimization-banner">
+            <CheckCircle size={24} aria-hidden="true" />
+            <div>
+              <p className="optimization-banner-text">
+                <strong>Profile Fully Optimized!</strong>
+                <br />
+                VoiceBridge has calibrated its speech recognition models to your
+                unique vocal profile.
+              </p>
+            </div>
           </div>
-        </div>
-      )}
+        )}
+      </div>
       <div className="recordings-list">
         {recordings.length === 0 ? (
           <div className="no-recordings-container">
@@ -197,32 +201,42 @@ const VoiceProfile = () => {
           onUpdateSuccess={fetchRecordings}
         />
       )}
-      <button
-        className="train-button"
-        onClick={handleTrainProfile}
-        disabled={loading || recordings.length < 15}
-        style={{
-          opacity: loading || recordings.length < 15 ? 0.6 : 1,
-          cursor: loading || recordings.length < 15 ? "not-allowed" : "pointer",
-          display: "flex",
-          alignItems: "center",
-          gap: "8px",
-        }}
-      >
-        {loading ? (
-          <>
-            <Loader2 size={18} className="animate-spin" aria-hidden="true" />
-            Training in Progress...
-          </>
-        ) : isOptimized ? (
-          "Retrain My Voice"
-        ) : (
-          "Train My Voice"
-        )}
-      </button>
+      <div className="training-control-card">
+        <div className="card-meta">
+          <h3>Ready to optimize VoiceBridge?</h3>
+          <p>
+            We will analyze your 15 audio samples to build your custom speech
+            calibration matrix.
+          </p>
+        </div>
+        <button
+          className="train-voice-button"
+          onClick={handleTrainProfile}
+          disabled={loading || recordings.length < 15}
+          style={{
+            opacity: loading || recordings.length < 15 ? 0.6 : 1,
+            cursor:
+              loading || recordings.length < 15 ? "not-allowed" : "pointer",
+            display: "flex",
+            alignItems: "center",
+            gap: "0.5rem",
+          }}
+        >
+          {loading ? (
+            <>
+              <Loader2 size={18} className="animate-spin" aria-hidden="true" />
+              Training in Progress...
+            </>
+          ) : isOptimized ? (
+            "Retrain My Voice"
+          ) : (
+            "Train My Voice"
+          )}
+        </button>
+      </div>
 
       {recordings.length < 15 && (
-        <p style={{ color: "#ef4444", fontSize: "14px", marginTop: "8px" }}>
+        <p style={{ color: "#ce0b0b", fontSize: "1rem", marginTop: "0.5rem" }}>
           * You need exactly 15 recordings to unlock profile training. (Current:{" "}
           {recordings.length}/15)
         </p>

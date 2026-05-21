@@ -78,34 +78,33 @@
 }
 
 .record-button {
-  background: #8b5cf6;
+  background-color: #7c3aed !important;
   color: #ffffff;
-  box-shadow: 0 0.25rem 0.875rem 0 rgba(139, 92, 246, 0.39);
 }
 
 .record-button:hover {
-  background: #7c3aed;
+  background-color: #6d28d9 !important;
   box-shadow: 0 0.375rem 1.25rem rgba(139, 92, 246, 0.45);
 }
 
 .stop-button {
-  background: #ff5f5f;
+  background: #dc1818 !important;
   color: #ffffff;
   box-shadow: 0 0.25rem 0.875rem 0 rgba(239, 68, 68, 0.39);
 }
 
 .stop-button:hover {
-  background: #e53939;
+  background: #c51e1e !important;
   box-shadow: 0 0.375rem 1.25rem rgba(239, 68, 68, 0.45);
 }
 
 .next-button {
-  background: #2ecc71;
+  background: #03873a !important;
   color: #ffffff;
   box-shadow: 0 0.25rem 0.875rem 0 rgba(16, 185, 129, 0.39);
 }
 .next-button:hover {
-  background: #16a34a;
+  background: #027b35 !important;
   box-shadow: 0 0.375rem 1.25rem rgba(16, 185, 129, 0.45);
 }
 .icon-celebration {
