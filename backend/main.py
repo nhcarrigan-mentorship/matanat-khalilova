@@ -365,3 +365,22 @@ async def train_profile(current_user: dict = Depends(get_current_user)):
         raise HTTPException(
             status_code=500, detail="Internal server error during profile training."
         )
+
+
+@app.get("/api/voice-profile/status")
+async def get_profile_status(current_user: dict = Depends(get_current_user)):
+    try:
+        actual_user_id = current_user["user"]["id"]
+
+        profile = await users_collection.find_one({"_id": ObjectId(actual_user_id)})
+
+        if profile and profile.get("is_optimized") is True:
+            return {"is_optimized": True}
+
+    except (KeyError, TypeError) as e:
+        print(f"Auth structure lookup mismatch: {e}")
+    except Exception as e:
+        print(f"Database error tracking profile status: {e}")
+
+    # Fallback default if they aren't optimized or if something fails
+    return {"is_optimized": False}

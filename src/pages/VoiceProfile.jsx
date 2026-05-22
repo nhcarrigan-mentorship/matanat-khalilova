@@ -17,6 +17,7 @@ const VoiceProfile = () => {
   const [isPlaying, setIsPlaying] = useState(null);
   const [selectedSample, setSelectedSample] = useState(null);
   const [isOptimized, setIsOptimized] = useState(false);
+  const [fetchingStatus, setFetchingStatus] = useState(true); // To handle initial loading blink
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
@@ -67,6 +68,32 @@ const VoiceProfile = () => {
     checkAuth();
   }, [navigate]);
 
+  useEffect(() => {
+    const fetchProfileStatus = async () => {
+      try {
+        // Fetch status from Backend API
+        const response = await fetch(
+          "http://localhost:8000/api/voice-profile/status",
+          {
+            method: "GET",
+            credentials: "include", // Send the HttpOnly cookie
+          },
+        );
+        const data = await response.json();
+        // Sync the state with the database truth
+        if (response.ok) {
+          setIsOptimized(data.is_optimized);
+        }
+      } catch (error) {
+        console.error("Error fetching profile status:", error); // eslint-disable-line no-console
+      } finally {
+        setFetchingStatus(false);
+      }
+    };
+
+    fetchProfileStatus();
+  }, []);
+
   const fetchRecordings = async () => {
     try {
       const response = await fetch("http://localhost:8000/api/my-recordings", {
@@ -108,6 +135,14 @@ const VoiceProfile = () => {
       setLoading(false);
     }
   };
+
+  if (fetchingStatus) {
+    return (
+      <div className="loading-container">
+        <p>Loading your profile settings...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="profile-container" style={{ padding: "2.5rem" }}>
