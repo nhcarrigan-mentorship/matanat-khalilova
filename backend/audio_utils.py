@@ -1,3 +1,4 @@
+import difflib
 import os
 import re
 
@@ -41,6 +42,53 @@ async def transcribe_audio_bytes(
         raise e
 
 
+def build_advanced_map(
+    original_text: str, whisper_text: str, sample_id: str = "unknown"
+) -> tuple[dict, float]:
+    """
+    Clean text to remove punctuation styling
+    for cleaner matching strings
+    """
+    # [^\w\s] means "match any character that is NOT a word character or whitespace"
+    o_clean = re.sub(r"[^\w\s]", "", original_text.lower()).strip()
+    w_clean = re.sub(r"[^\w\s]", "", whisper_text.lower()).strip()
+
+    original_words = o_clean.split()
+    whisper_words = w_clean.split()
+
+    print(
+        f"Words Expected Count: {len(original_words)}\n"
+        f"Words Heard Count: {len(whisper_words)}"
+    )
+
+    matcher = difflib.SequenceMatcher(None, whisper_words, original_words)
+    match_ratio = matcher.ratio()
+    """
+    The safety Guardrail:
+    If the strings match less than 35%,
+    Whisper hallucinated or audio was junk, skip mapping for this sample
+    """
+    if match_ratio < 0.35:
+        print(
+            f"Low match ratio ({match_ratio:.2f})."
+            f"Skipping hallucination "
+            f"for sample {sample_id}."
+        )
+        return {}, match_ratio
+    phrase_map = {}
+
+    for tag, i1, i2, j1, j2 in matcher.get_opcodes():
+        if tag == "replace":
+            w_chunk = " ".join(whisper_words[i1:i2])
+            o_chunk = " ".join(original_words[j1:j2])
+
+            # Double check to prevent empty string artifacts
+            if w_chunk.strip() and o_chunk.strip():
+                phrase_map[w_chunk] = o_chunk
+
+    return phrase_map, match_ratio
+
+
 async def process_voice_profile_training(user_id: str) -> dict:
     """
     1. Fetches all 15 validated voice samples for the user.
@@ -48,14 +96,15 @@ async def process_voice_profile_training(user_id: str) -> dict:
     3. Transcribes them with Groq Whisper.
     4. Compares 'text' ('original_text') vs 'whisper_text' to build a correction prompt.
     """
-    # 1: Fetch all validated samples for this user
+    # 1. Fetch all validated samples for this user
     cursor = db.voice_samples.find({"user_id": user_id, "is_validated": True})
     samples = await cursor.to_list(length=20)
 
     if not samples:
         raise ValueError("No validated samples found for this user.")
 
-    correction_map = {}
+    master_correction_map = {}
+    successful_matches_count = 0
 
     """
     Initialize a reusable async HTTP client for downloading
@@ -95,26 +144,66 @@ async def process_voice_profile_training(user_id: str) -> dict:
                     audio_bytes, filename=f"sample_{sample['_id']}.wav"
                 )
 
-                original_words = re.findall(r"\b\w+\b", original_text.lower())
-                whisper_words = re.findall(r"\b\w+\b", whisper_text.lower())
+                print("\n--- AI PIPELINE DIAGNOSTIC ---")
+                print(f"Phrase ID: {sample.get('phrase_id')}")
+                print(f"EXPECTED TRUTH: '{original_text}'")
+                print(f"WHISPER HEARD:  '{whisper_text}'")
 
-                if len(original_words) == len(whisper_words):
-                    for w_word, o_word in zip(whisper_words, original_words):
-                        if w_word != o_word:
-                            correction_map[w_word] = o_word
+                # 4. Call the external function to build correction map for the sample
+                sample_map, match_ratio = build_advanced_map(
+                    original_text, whisper_text, str(sample["_id"])
+                )
+
+                if match_ratio < 0.35:
+                    print(
+                        f"Sample {sample['_id']} failed quality check "
+                        f"(Ratio: {match_ratio:.2f})."
+                    )
+                    print("Not counting toward calibration matrix.")
+                    continue
+
+                master_correction_map.update(sample_map)
+                successful_matches_count += 1
 
             except Exception as e:
                 print(f"Skipping sample {sample['_id']} due to error: {e}")
                 continue
 
+    if successful_matches_count < 10:
+        raise ValueError(
+            f"Training failed. Audio quality was too low across your recordings. "
+            f"Only {successful_matches_count}/{len(samples)} samples passed validation."
+            f" Please check your voice profile and re-record your low-quality clips."
+        )
+
     map_str = ", ".join(
-        [f"replace '{k}' with '{v}'" for k, v in correction_map.items()]
+        [f"replace '{k}' with '{v}'" for k, v in master_correction_map.items()]
     )
     correction_prompt = (
-        f"The user has dysarthric speech patterns. "
-        f"Apply these exact word substitutions to every transcription: {map_str}"
-        if map_str
-        else ""
+        f"You are a speech correction assistant for a user with dysarthric speech. "
+        f"Whisper speech recognition consistently mishears this specific user. "
+        f"Below are known patterns where the left side is what Whisper heard "
+        f"and the right side is what the user actually meant: {map_str}. "
+        f"When given a raw Whisper transcription, use these patterns AND contextual "
+        f"reasoning to rewrite it as natural, grammatically correct English. "
+        f"If a word sounds phonetically similar to a known pattern, "
+        f"apply the correction. "
+        f"Preserve the user's intended meaning above all else. "
+        f"Return only the corrected text, nothing else."
     )
 
-    return {"correction_map": correction_map, "correction_prompt": correction_prompt}
+    await db.users.update_one(
+        {"_id": ObjectId(user_id)},
+        {
+            "$set": {
+                "is_optimized": True,
+                "correction_map": master_correction_map,
+                "correction_prompt": correction_prompt,
+            }
+        },
+    )
+
+    return {
+        "correction_map": master_correction_map,
+        "correction_prompt": correction_prompt,
+    }
