@@ -42,6 +42,41 @@ async def transcribe_audio_bytes(
         raise e
 
 
+def normalize_numerics(text: str) -> str:
+    """
+    Converts common digits into text words to prevent text-inversion bugs.
+    """
+    num_map = {
+        "0": "zero",
+        "1": "one",
+        "2": "two",
+        "3": "three",
+        "4": "four",
+        "5": "five",
+        "6": "six",
+        "7": "seven",
+        "8": "eight",
+        "9": "nine",
+        "10": "ten",
+        "11": "eleven",
+        "12": "twelve",
+        "13": "thirteen",
+        "14": "fourteen",
+        "15": "fifteen",
+        "16": "sixteen",
+        "17": "seventeen",
+        "18": "eighteen",
+        "19": "nineteen",
+        "20": "twenty",
+        "32": "thirty two",
+        "33": "thirty three",
+    }
+
+    words = text.split()
+    normalized_words = [num_map.get(word, word) for word in words]
+    return " ".join(normalized_words)
+
+
 def build_advanced_map(
     original_text: str, whisper_text: str, sample_id: str = "unknown"
 ) -> tuple[dict, float]:
@@ -52,6 +87,13 @@ def build_advanced_map(
     # [^\w\s] means "match any character that is NOT a word character or whitespace"
     o_clean = re.sub(r"[^\w\s]", "", original_text.lower()).strip()
     w_clean = re.sub(r"[^\w\s]", "", whisper_text.lower()).strip()
+
+    # Force collapse internal double spaces before numeric normalization
+    o_clean = " ".join(o_clean.split())
+    w_clean = " ".join(w_clean.split())
+
+    o_clean = normalize_numerics(o_clean)
+    w_clean = normalize_numerics(w_clean)
 
     original_words = o_clean.split()
     whisper_words = w_clean.split()
@@ -79,12 +121,19 @@ def build_advanced_map(
 
     for tag, i1, i2, j1, j2 in matcher.get_opcodes():
         if tag == "replace":
-            w_chunk = " ".join(whisper_words[i1:i2])
-            o_chunk = " ".join(original_words[j1:j2])
+            w_chunk = whisper_words[i1:i2]
+            o_chunk = original_words[j1:j2]
 
-            # Double check to prevent empty string artifacts
-            if w_chunk.strip() and o_chunk.strip():
-                phrase_map[w_chunk] = o_chunk
+            if len(w_chunk) == len(o_chunk):
+                for w_word, o_word in zip(w_chunk, o_chunk):
+                    if w_word != o_word:
+                        phrase_map[w_word] = o_word
+
+            elif len(w_chunk) > 0 and len(o_chunk) > 0:
+                w_phrase = " ".join(w_chunk)
+                o_phrase = " ".join(o_chunk)
+                if w_phrase != o_phrase:
+                    phrase_map[w_phrase] = o_phrase
 
     return phrase_map, match_ratio
 
