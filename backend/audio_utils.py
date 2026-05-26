@@ -225,34 +225,38 @@ async def process_voice_profile_training(user_id: str) -> dict:
             f" Please check your voice profile and re-record your low-quality clips."
         )
 
-    map_str = ", ".join(
-        [f"replace '{k}' with '{v}'" for k, v in master_correction_map.items()]
-    )
-    correction_prompt = (
-        f"You are a speech correction assistant for a user with dysarthric speech. "
-        f"Whisper speech recognition consistently mishears this specific user. "
-        f"Below are known patterns where the left side is what Whisper heard "
-        f"and the right side is what the user actually meant: {map_str}. "
-        f"When given a raw Whisper transcription, use these patterns AND contextual "
-        f"reasoning to rewrite it as natural, grammatically correct English. "
-        f"If a word sounds phonetically similar to a known pattern, "
-        f"apply the correction. "
-        f"Preserve the user's intended meaning above all else. "
-        f"Return only the corrected text, nothing else."
-    )
+    # Initialize defaults
+    correction_prompt = ""
 
-    await db.users.update_one(
-        {"_id": ObjectId(user_id)},
-        {
-            "$set": {
-                "is_optimized": True,
-                "correction_map": master_correction_map,
-                "correction_prompt": correction_prompt,
-            }
-        },
-    )
+    # Only compile patterns if mistakes were actually found
+    if master_correction_map:
+        map_str = ", ".join(
+            [f"replace '{k}' with '{v}'" for k, v in master_correction_map.items()]
+        )
+
+        correction_prompt = (
+            f"You are a speech correction assistant for a user with dysarthric speech. "
+            f"Whisper speech recognition consistently mishears this specific user. "
+            f"Below are known patterns where the left side is what Whisper heard "
+            f"and the right side is what the user actually meant: {map_str}. "
+            f"When given a raw Whisper transcription, use these patterns AND "
+            f"contextual reasoning to rewrite it as natural, grammatically "
+            f"correct English. If a word sounds phonetically similar "
+            f"to a known pattern, apply the correction. "
+            f"IMPORTANT: The user speaks English only. If Whisper outputs foreign "
+            f"language text, it is a hallucination — the user was speaking English. "
+            f"Preserve the user's intended meaning above all else. "
+            f"Return only the corrected text, nothing else."
+        )
 
     return {
+        "is_optimized": True,
+        "has_patterns": len(master_correction_map) > 0,
         "correction_map": master_correction_map,
         "correction_prompt": correction_prompt,
     }
+
+
+# TODO: Future enhancement — phonetic matching using jellyfish
+# library to catch variations like "suada" vs "suadi" mapping
+# to same correction. Current map requires exact word match.

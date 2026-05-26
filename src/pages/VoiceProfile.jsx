@@ -17,6 +17,7 @@ const VoiceProfile = () => {
   const [isPlaying, setIsPlaying] = useState(null);
   const [selectedSample, setSelectedSample] = useState(null);
   const [isOptimized, setIsOptimized] = useState(false);
+  const [hasPatterns, setHasPatterns] = useState(false);
   const [fetchingStatus, setFetchingStatus] = useState(true); // To handle initial loading blink
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
@@ -83,6 +84,7 @@ const VoiceProfile = () => {
         // Sync the state with the database truth
         if (response.ok) {
           setIsOptimized(data.is_optimized);
+          setHasPatterns(data.has_patterns || false); // Default to false if not provided
         }
       } catch (error) {
         console.error("Error fetching profile status:", error); // eslint-disable-line no-console
@@ -125,9 +127,10 @@ const VoiceProfile = () => {
         method: "POST",
         credentials: "include",
       });
-      const data = await response.json();
-      if (data.status === "success") {
+      const resPayload = await response.json();
+      if (resPayload.status === "success") {
         setIsOptimized(true);
+        setHasPatterns(resPayload.data.has_patterns); // Update pattern status based on training results
       }
     } catch (error) {
       console.error("Error training voice profile:", error); // eslint-disable-line no-console
@@ -166,12 +169,23 @@ const VoiceProfile = () => {
           <div className="optimization-banner">
             <CheckCircle size={24} aria-hidden="true" />
             <div>
-              <p className="optimization-banner-text">
-                <strong>Profile Fully Optimized!</strong>
-                <br />
-                VoiceBridge has calibrated its speech recognition models to your
-                unique vocal profile.
-              </p>
+              {hasPatterns ? (
+                // State A: Variations/Distortions detected and mapped
+                <p className="optimization-banner-text">
+                  <strong>Profile Fully Optimized!</strong>
+                  <br />
+                  VoiceBridge has built a custom speech correction matrix to map
+                  and optimize your unique vocal patterns.
+                </p>
+              ) : (
+                // State B: All 15 recordings matched raw text perfectly
+                <p className="optimization-banner-text">
+                  <strong>Profile Optimized with Natural Clarity!</strong>
+                  <br />
+                  Your training recordings match perfectly. VoiceBridge has
+                  calibrated your profile to run fast direct-transcription.
+                </p>
+              )}
             </div>
           </div>
         )}

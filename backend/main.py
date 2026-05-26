@@ -344,6 +344,7 @@ async def train_profile(current_user: dict = Depends(get_current_user)):
                 "$set": {
                     "correction_map": training_results["correction_map"],
                     "correction_prompt": training_results["correction_prompt"],
+                    "has_patterns": training_results["has_patterns"],
                     "is_optimized": True,
                 }
             },
@@ -354,6 +355,7 @@ async def train_profile(current_user: dict = Depends(get_current_user)):
             "message": "Voice profile training completed successfully!",
             "data": {
                 "is_optimized": True,
+                "has_patterns": training_results["has_patterns"],
                 "mapped_words_count": len(training_results["correction_map"]),
             },
         }
@@ -371,11 +373,13 @@ async def train_profile(current_user: dict = Depends(get_current_user)):
 async def get_profile_status(current_user: dict = Depends(get_current_user)):
     try:
         actual_user_id = current_user["user"]["id"]
-
         profile = await users_collection.find_one({"_id": ObjectId(actual_user_id)})
 
         if profile and profile.get("is_optimized") is True:
-            return {"is_optimized": True}
+            return {
+                "is_optimized": True,
+                "has_patterns": profile.get("has_patterns", False),
+            }
 
     except (KeyError, TypeError) as e:
         print(f"Auth structure lookup mismatch: {e}")
@@ -383,4 +387,4 @@ async def get_profile_status(current_user: dict = Depends(get_current_user)):
         print(f"Database error tracking profile status: {e}")
 
     # Fallback default if they aren't optimized or if something fails
-    return {"is_optimized": False}
+    return {"is_optimized": False, "has_patterns": False}
