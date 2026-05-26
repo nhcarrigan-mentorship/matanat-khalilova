@@ -20,6 +20,7 @@ from fastapi import (
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, EmailStr, field_validator
 
+from audio_utils import process_voice_profile_training
 from auth_utils import create_access_token, verify_access_token
 from database import client, db, phrases_collection, users_collection
 
@@ -99,6 +100,10 @@ async def signup(user: UserSignup, response: Response):
         "name": user.name,
         "email": user.email,
         "password": hashed_password,  # Save the hash, not the plain text password
+        "is_trained": False,
+        "is_optimized": False,
+        "correction_prompt": "",
+        "correction_map": {},
     }
 
     # 4. Save to MongoDB
@@ -176,7 +181,16 @@ async def get_current_user(request: Request):
             "id": str(user["_id"]),
             "email": user["email"],
             "name": user["name"],
-            "is_trained": user.get("is_trained", False),
+            "is_trained": user.get(
+                "is_trained", False
+            ),  # 15/15 sample recorded and validated
+            "is_optimized": user.get("is_optimized", False),  # Whisper patterns mapped
+            "correction_prompt": user.get(
+                "correction_prompt", ""
+            ),  # The generated correction prompt for Whisper
+            "correction_map": user.get(
+                "correction_map", {}
+            ),  # The generated correction map for Whisper
         },
     }
 
@@ -311,3 +325,66 @@ async def get_user_recordings(current_user: dict = Depends(get_current_user)):
         return {"status": "success", "count": len(samples), "recordings": samples}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/train-profile")
+async def train_profile(current_user: dict = Depends(get_current_user)):
+    try:
+        # The logged-in user's ID
+        actual_user_id = current_user["user"]["id"]
+
+        """Running the Cloudinary download -> Groq Whisper transcription
+        to generate the correction maps"""
+        training_results = await process_voice_profile_training(actual_user_id)
+
+        # Updating the user's profile documents with the new AI mappings
+        await db.users.update_one(
+            {"_id": ObjectId(actual_user_id)},
+            {
+                "$set": {
+                    "correction_map": training_results["correction_map"],
+                    "correction_prompt": training_results["correction_prompt"],
+                    "has_patterns": training_results["has_patterns"],
+                    "is_optimized": True,
+                }
+            },
+        )
+        # Return the training results to the frontend to update the UI accordingly
+        return {
+            "status": "success",
+            "message": "Voice profile training completed successfully!",
+            "data": {
+                "is_optimized": True,
+                "has_patterns": training_results["has_patterns"],
+                "mapped_words_count": len(training_results["correction_map"]),
+            },
+        }
+    except ValueError as val_err:
+        # Catches the specific "No validated samples found for this user." error
+        raise HTTPException(status_code=400, detail=str(val_err))
+    except Exception as e:
+        print(f"Error during profile training endpoint execution: {e}")
+        raise HTTPException(
+            status_code=500, detail="Internal server error during profile training."
+        )
+
+
+@app.get("/api/voice-profile/status")
+async def get_profile_status(current_user: dict = Depends(get_current_user)):
+    try:
+        actual_user_id = current_user["user"]["id"]
+        profile = await users_collection.find_one({"_id": ObjectId(actual_user_id)})
+
+        if profile and profile.get("is_optimized") is True:
+            return {
+                "is_optimized": True,
+                "has_patterns": profile.get("has_patterns", False),
+            }
+
+    except (KeyError, TypeError) as e:
+        print(f"Auth structure lookup mismatch: {e}")
+    except Exception as e:
+        print(f"Database error tracking profile status: {e}")
+
+    # Fallback default if they aren't optimized or if something fails
+    return {"is_optimized": False, "has_patterns": False}

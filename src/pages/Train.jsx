@@ -291,7 +291,7 @@ const Train = () => {
             </div>
           )}
           {error && (
-            <p className="error-message" style={{ color: "red" }}>
+            <p className="error-message" style={{ color: "#cd0808" }}>
               {error}
             </p>
           )}

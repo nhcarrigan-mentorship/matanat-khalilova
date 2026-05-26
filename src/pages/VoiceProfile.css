@@ -13,12 +13,12 @@
   align-items: center;
   justify-content: center;
   background: none;
-  color: #bf94e5;
+  color: #9e3ef3;
 }
 
 .back-link:hover {
   background: #f3eaff;
-  color: #a754f0;
+  color: #7c3aed;
 }
 
 .profile-container {
@@ -86,4 +86,94 @@ p {
 
 .recordings-list {
   margin-top: 2rem;
+}
+
+.optimization-banner {
+  display: flex;
+  align-items: center;
+  flex-direction: column;
+  gap: 0.63rem;
+  background: #f0fdf4;
+  border: 0.06rem solid #bbf7d0;
+  padding: 0.8rem;
+  border-radius: 0.5rem;
+  margin: 1.25rem 0;
+  color: #16a34a;
+  line-height: 1.5;
+}
+
+.optimization-banner-text {
+  margin-top: 0;
+  font-size: 1.15rem;
+  color: #15803d;
+}
+
+.train-voice-button {
+  margin: 2rem auto;
+  display: block;
+  background-color: #7c3aed;
+  color: #ffffff !important;
+  font-size: 0.95rem;
+  font-weight: 600;
+  padding: 1.5rem;
+  border: none;
+  border-radius: 0.5rem;
+  cursor: pointer;
+  gap: 0.5rem;
+  transition: all 0.2s ease-in-out;
+  width: auto;
+  text-align: center;
+}
+
+.train-voice-button:hover {
+  background-color: #6d28d9;
+}
+
+.training-control-card {
+  margin-top: 2.5rem;
+  padding: 1.5rem;
+  background-color: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.75rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  box-shadow:
+    0 4px 6px -1px rgba(0, 0, 0, 0.05),
+    0 2px 4px -1px rgba(0, 0, 0, 0.03);
+}
+
+.card-meta h3 {
+  font-size: 1.125rem;
+  color: #1f2937;
+  font-weight: 600;
+}
+
+.card-meta p {
+  margin-top: 0.5rem;
+  font-size: 1rem;
+  color: #595e69;
+  text-align: left;
+}
+
+/* Responsive Tweak */
+@media (max-width: 48rem) {
+  .training-control-card {
+    flex-direction: column;
+    text-align: center;
+    gap: 1rem;
+  }
+}
+
+.animate-spin {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
 }

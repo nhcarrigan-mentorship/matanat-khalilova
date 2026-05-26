@@ -167,8 +167,12 @@ const RecordModal = ({ sample, onClose, onUpdateSuccess }) => {
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-        <button className="close-button" onClick={onClose}>
-          <X size={24} />
+        <button
+          className="close-button"
+          onClick={onClose}
+          aria-label="Close modal"
+        >
+          <X size={24} aria-hidden="true" />
         </button>
         <h2>Re-record Sample</h2>
         <p className="phrase-text">

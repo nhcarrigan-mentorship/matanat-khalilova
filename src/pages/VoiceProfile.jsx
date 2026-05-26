@@ -1,5 +1,12 @@
 import React, { useEffect, useState } from "react";
-import { Play, ArrowLeft, Pause, RotateCcw } from "lucide-react";
+import {
+  Play,
+  ArrowLeft,
+  Pause,
+  RotateCcw,
+  Loader2,
+  CheckCircle,
+} from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import "./VoiceProfile.css";
 import RecordModal from "../components/voice/RecordModal.jsx";
@@ -9,6 +16,10 @@ const VoiceProfile = () => {
   const [user, setUser] = useState(null);
   const [isPlaying, setIsPlaying] = useState(null);
   const [selectedSample, setSelectedSample] = useState(null);
+  const [isOptimized, setIsOptimized] = useState(false);
+  const [hasPatterns, setHasPatterns] = useState(false);
+  const [fetchingStatus, setFetchingStatus] = useState(true); // To handle initial loading blink
+  const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
   const handlePlay = (rec) => {
@@ -58,6 +69,33 @@ const VoiceProfile = () => {
     checkAuth();
   }, [navigate]);
 
+  useEffect(() => {
+    const fetchProfileStatus = async () => {
+      try {
+        // Fetch status from Backend API
+        const response = await fetch(
+          "http://localhost:8000/api/voice-profile/status",
+          {
+            method: "GET",
+            credentials: "include", // Send the HttpOnly cookie
+          },
+        );
+        const data = await response.json();
+        // Sync the state with the database truth
+        if (response.ok) {
+          setIsOptimized(data.is_optimized);
+          setHasPatterns(data.has_patterns || false); // Default to false if not provided
+        }
+      } catch (error) {
+        console.error("Error fetching profile status:", error); // eslint-disable-line no-console
+      } finally {
+        setFetchingStatus(false);
+      }
+    };
+
+    fetchProfileStatus();
+  }, []);
+
   const fetchRecordings = async () => {
     try {
       const response = await fetch("http://localhost:8000/api/my-recordings", {
@@ -78,8 +116,39 @@ const VoiceProfile = () => {
     fetchRecordings();
   }, []);
 
+  const handleTrainProfile = async () => {
+    if (recordings.length < 15) return; // Safeguard client-side
+
+    setIsPlaying(null); // Stop any playing audio
+    window.currentAudio?.pause();
+    setLoading(true);
+    try {
+      const response = await fetch("http://localhost:8000/api/train-profile", {
+        method: "POST",
+        credentials: "include",
+      });
+      const resPayload = await response.json();
+      if (resPayload.status === "success") {
+        setIsOptimized(true);
+        setHasPatterns(resPayload.data.has_patterns); // Update pattern status based on training results
+      }
+    } catch (error) {
+      console.error("Error training voice profile:", error); // eslint-disable-line no-console
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (fetchingStatus) {
+    return (
+      <div className="loading-container">
+        <p>Loading your profile settings...</p>
+      </div>
+    );
+  }
+
   return (
-    <div className="profile-container" style={{ padding: "40px" }}>
+    <div className="profile-container" style={{ padding: "2.5rem" }}>
       <button onClick={() => navigate("/dashboard")} className="back-link">
         <ArrowLeft size={18} aria-hidden="true" /> Back to Dashboard
       </button>
@@ -93,6 +162,34 @@ const VoiceProfile = () => {
         Review your samples below or re-record any if you would like to improve
         the accuracy.
       </p>
+      {/* UI Success Status Notification */}
+      {/* This wrapper stays in the DOM so assistive tech is always listening for updates */}
+      <div aria-live="polite" aria-atomic="true">
+        {isOptimized && (
+          <div className="optimization-banner">
+            <CheckCircle size={24} aria-hidden="true" />
+            <div>
+              {hasPatterns ? (
+                // State A: Variations/Distortions detected and mapped
+                <p className="optimization-banner-text">
+                  <strong>Profile Fully Optimized!</strong>
+                  <br />
+                  VoiceBridge has built a custom speech correction matrix to map
+                  and optimize your unique vocal patterns.
+                </p>
+              ) : (
+                // State B: All 15 recordings matched raw text perfectly
+                <p className="optimization-banner-text">
+                  <strong>Profile Optimized with Natural Clarity!</strong>
+                  <br />
+                  Your training recordings match perfectly. VoiceBridge has
+                  calibrated your profile to run fast direct-transcription.
+                </p>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
       <div className="recordings-list">
         {recordings.length === 0 ? (
           <div className="no-recordings-container">
@@ -152,6 +249,46 @@ const VoiceProfile = () => {
           onClose={() => setSelectedSample(null)}
           onUpdateSuccess={fetchRecordings}
         />
+      )}
+      <div className="training-control-card">
+        <div className="card-meta">
+          <h3>Ready to optimize VoiceBridge?</h3>
+          <p>
+            We will analyze your 15 audio samples to build your custom speech
+            calibration matrix.
+          </p>
+        </div>
+        <button
+          className="train-voice-button"
+          onClick={handleTrainProfile}
+          disabled={loading || recordings.length < 15}
+          style={{
+            opacity: loading || recordings.length < 15 ? 0.6 : 1,
+            cursor:
+              loading || recordings.length < 15 ? "not-allowed" : "pointer",
+            display: "flex",
+            alignItems: "center",
+            gap: "0.5rem",
+          }}
+        >
+          {loading ? (
+            <>
+              <Loader2 size={18} className="animate-spin" aria-hidden="true" />
+              Training in Progress...
+            </>
+          ) : isOptimized ? (
+            "Retrain My Voice"
+          ) : (
+            "Train My Voice"
+          )}
+        </button>
+      </div>
+
+      {recordings.length < 15 && (
+        <p style={{ color: "#ce0b0b", fontSize: "1rem", marginTop: "0.5rem" }}>
+          * You need exactly 15 recordings to unlock profile training. (Current:{" "}
+          {recordings.length}/15)
+        </p>
       )}
     </div>
   );
