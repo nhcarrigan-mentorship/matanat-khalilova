@@ -7,7 +7,8 @@ import cloudinary
 import cloudinary.uploader
 from bson import ObjectId
 from dotenv import load_dotenv
-from fastapi import (
+from fastapi import (  # status,
+    APIRouter,
     Depends,
     FastAPI,
     File,
@@ -20,11 +21,12 @@ from fastapi import (
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, EmailStr, field_validator
 
-from audio_utils import process_voice_profile_training
+from audio_utils import process_voice_profile_training, transcribe_audio_bytes
 from auth_utils import create_access_token, verify_access_token
 from database import client, db, phrases_collection, users_collection
 
 app = FastAPI()
+router = APIRouter()
 
 # Load environment variables from .env file
 load_dotenv()
@@ -388,3 +390,79 @@ async def get_profile_status(current_user: dict = Depends(get_current_user)):
 
     # Fallback default if they aren't optimized or if something fails
     return {"is_optimized": False, "has_patterns": False}
+
+
+@app.post("/api/translate/instant")
+async def consecutive_translation(
+    audio_file: UploadFile = File(...),
+    current_user: dict = Depends(get_current_user),
+):
+    try:
+        if not audio_file.filename.endswith((".wav", ".mp3", ".m4a", ".webm")):
+            raise HTTPException(
+                status_code=400,
+                detail="Unsupported file type. Please upload a valid audio file.",
+            )
+        # 1, Read the raw binary audio data from the frontend upload
+        audio_bytes = await audio_file.read()
+        # 2. Forward it to the Groq Whisper API for raw transcription
+        raw_transcription = await transcribe_audio_bytes(
+            audio_bytes, filename=audio_file.filename
+        )
+        # 3. Query MongoDB for this authenticated user's profile correction_prompt
+        actual_user_id = current_user["user"]["id"]
+        user_profile = await users_collection.find_one(
+            {"_id": ObjectId(actual_user_id)}
+        )
+
+        if not user_profile:
+            raise HTTPException(status_code=404, detail="User profile not found")
+
+        # Extract the correction prompt rules from the user's profile
+        correction_prompt = user_profile.get("correction_prompt", "")
+        # 4. If prompt exists, send (Raw Text + Prompt) to Llama-3.1-8b-instant
+        if correction_prompt and correction_prompt.strip():
+            from audio_utils import groq_client
+
+            user_content = (
+                f"SPEECH PROFILE RULES:\n{correction_prompt}\n\n"
+                f"RAW TRANSCRIPTION:\n{raw_transcription}"
+            )
+
+            llm_response = await groq_client.chat.completions.create(
+                model="llama-3.1-8b-instant",
+                messages=[
+                    {
+                        "role": "system",
+                        "content": (
+                            "You are an AI Assistive Speech Refiner. "
+                            "Your job is to correct transcription errors "
+                            "based STRICTLY on the user's custom speech profile rules. "
+                            "Fix stuttering, misheard terminology, "
+                            "or context errors as defined by the rules. "
+                            "Keep the final text natural. Return ONLY the "
+                            "corrected text string and nothing else—no pleasantries, "
+                            "no conversational responses."
+                        ),
+                    },
+                    {
+                        "role": "user",
+                        "content": user_content,
+                    },
+                ],
+                temperature=0.2,  # Low temperature for more deterministic corrections
+            )
+            corrected_text = llm_response.choices[0].message.content.strip()
+        else:
+            # If no correction prompt is set up, just return the raw transcription
+            corrected_text = raw_transcription
+        # 5. Return the final corrected text string to the frontend
+        return {
+            "status": "success",
+            "raw_transcription": raw_transcription,
+            "corrected_text": corrected_text,
+        }
+    except Exception as e:
+        raise HTTPException(
+            status_code=500, detail=f"Error processing audio translation: {str(e)}"
+        )
