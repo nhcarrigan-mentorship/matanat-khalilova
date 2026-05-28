@@ -391,7 +391,6 @@ async def get_profile_status(current_user: dict = Depends(get_current_user)):
     # Fallback default if they aren't optimized or if something fails
     return {"is_optimized": False, "has_patterns": False}
 
-
 @app.post("/api/translate/instant")
 async def consecutive_translation(
     audio_file: UploadFile = File(...),
