@@ -1,4 +1,5 @@
 # 🎙️ VoiceBridge
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 Empowering individuals with speech disabilities by transforming atypical speech into clear, effective communication.
 
