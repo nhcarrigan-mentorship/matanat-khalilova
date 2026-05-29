@@ -1,0 +1,87 @@
+button {
+  padding: 0.5rem 1.2rem;
+  font-size: 1rem;
+  color: white;
+  border: none;
+  border-radius: 2rem;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  width: auto;
+  gap: 0.5rem; /* Puts clean spacing between emoji and text */
+  white-space: nowrap; /* Guarantees the text never breaks to a new line */
+}
+
+.meeting-sandbox {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 2rem;
+  margin: 0 auto;
+  font-family: sans-serif;
+  max-width: 50rem;
+}
+
+.link {
+  text-decoration: none;
+  color: #2828c2;
+  font-weight: 500;
+}
+
+.info-banner-warning {
+  background-color: #fff3cd;
+  color: #856404;
+  line-height: 1.5;
+  padding: 1rem;
+  border-radius: 0.5rem;
+  margin-bottom: 1rem;
+  margin-top: 1rem;
+}
+
+.info-banner-success {
+  background-color: #d4edda;
+  color: #155724;
+  line-height: 1.5;
+  padding: 1rem;
+  border-radius: 0.5rem;
+  margin-bottom: 1rem;
+  margin-top: 1rem;
+}
+
+.recording-workspace {
+  border: 1px solid #ccc;
+  padding: 2rem;
+  border-radius: 0.5rem;
+  text-align: center;
+}
+
+.transcription-output {
+  width: 100%;
+  box-sizing: border-box; /* Prevents padding from breaking width */
+  padding: 1rem;
+  font-size: 1rem;
+  font-family: inherit;
+  background-color: #f8f9fa;
+  border: 1px solid #e9ecef;
+  border-radius: 0.5rem;
+  resize: vertical; /* Allows users to pull down but not break layout width wise */
+  outline: none; /* Removes harsh blue outline on focus */
+  transition: border-color 0.2s;
+}
+
+.transcription-section {
+  margin-top: 2rem;
+  text-align: left;
+}
+
+/* When the textarea is locked, make it look disabled/inactive */
+.transcription-output[readonly] {
+  background-color: #e9ecef; /* Slightly darker gray */
+  color: #6c757d; /* Muted text color */
+  cursor: not-allowed;
+  border-color: #ced4da;
+}
+
+.audio-review-section {
+  margin-top: 1.5rem;
+  text-align: center;
+}

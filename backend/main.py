@@ -391,6 +391,7 @@ async def get_profile_status(current_user: dict = Depends(get_current_user)):
     # Fallback default if they aren't optimized or if something fails
     return {"is_optimized": False, "has_patterns": False}
 
+
 @app.post("/api/translate/instant")
 async def consecutive_translation(
     audio_file: UploadFile = File(...),
@@ -402,7 +403,7 @@ async def consecutive_translation(
                 status_code=400,
                 detail="Unsupported file type. Please upload a valid audio file.",
             )
-        # 1, Read the raw binary audio data from the frontend upload
+        # 1. Read the raw binary audio data from the frontend upload
         audio_bytes = await audio_file.read()
         # 2. Forward it to the Groq Whisper API for raw transcription
         raw_transcription = await transcribe_audio_bytes(
