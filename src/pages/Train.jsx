@@ -182,11 +182,21 @@ const Train = () => {
 
         if (response.ok) {
           setUser(data.user);
+
+          if (
+            data.user &&
+            typeof data.user.is_trained !== "undefined" &&
+            data.user.is_trained !== true
+          ) {
+            navigate("/train", { replace: true });
+          }
         } else {
           navigate("/login");
         }
       } catch (error) {
         console.error("Failed to fetch user data", error); // eslint-disable-line no-console
+        // Secure the fallback route in case of complete network/server failures
+        navigate("/login");
       }
     };
     fetchUser();

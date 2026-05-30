@@ -201,6 +201,7 @@ const MeetingSandbox = () => {
             : "Press and hold to record audio"}
         </p>
         <button
+          className="recording-trigger-btn"
           onMouseDown={(e) => startRecording(e)}
           onMouseUp={(e) => stopRecording(e)}
           onTouchStart={(e) => startRecording(e)}
@@ -238,7 +239,7 @@ const MeetingSandbox = () => {
         </button>
 
         <div className="transcription-section">
-          <h4>Live Output:</h4>
+          <h3 id="transcribed-text-output">Live Output:</h3>
           <textarea
             className="transcription-output"
             cols={60}
@@ -247,16 +248,18 @@ const MeetingSandbox = () => {
             rows={5}
             readOnly={isRecording || status === "Processing audio..."} // Lock the field if recording or if the backend is processing audio
             onChange={(e) => setTranscription(e.target.value)}
+            aria-labelledby="transcribed-text-output"
           />
         </div>
       </div>
 
       {audioUrl && (
         <div className="audio-review-section">
-          <h3>Review Local Recording:</h3>
+          <h3 id="audio-review-title">Review Local Recording:</h3>
           <audio
             src={audioUrl}
             controls
+            aria-labelledby="audio-review-title"
             onLoadedMetadata={(e) => {
               // If duration is infinite/unknown, trick the browser into calculating it instantly
               if (e.target.duration === Infinity || isNaN(e.target.duration)) {

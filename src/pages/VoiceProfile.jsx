@@ -59,6 +59,19 @@ const VoiceProfile = () => {
 
         if (response.ok) {
           setUser(data.user);
+          if (
+            data.user &&
+            typeof data.user.is_trained !== "undefined" &&
+            data.user.is_trained !== true
+          ) {
+            navigate("/train", {
+              replace: true, // Replaces the profile URL in history so they don't get stuck in a back-button loop
+              state: {
+                message:
+                  "Complete all 15 speech recordings to unlock your Voice Profile view!",
+              },
+            });
+          }
         } else {
           navigate("/login");
         }
