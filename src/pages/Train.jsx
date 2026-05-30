@@ -183,12 +183,10 @@ const Train = () => {
         if (response.ok) {
           setUser(data.user);
 
-          if (
-            data.user &&
-            typeof data.user.is_trained !== "undefined" &&
-            data.user.is_trained !== true
-          ) {
-            navigate("/train", { replace: true });
+          // If they are already fully trained, don't make them re-train
+          // Send them directly forward to their voice profile.
+          if (data.user && data.user.is_trained === true) {
+            navigate("/voice-profile", { replace: true });
           }
         } else {
           navigate("/login");
