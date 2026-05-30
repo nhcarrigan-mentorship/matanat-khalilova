@@ -7,7 +7,7 @@ const MeetingSandbox = () => {
   const [transcription, setTranscription] = useState("");
   const [isRecording, setIsRecording] = useState(false);
   const [status, setStatus] = useState("Idle");
-  const [audioUrl, setAudioUrl] = useState(false);
+  const [audioUrl, setAudioUrl] = useState("");
   const navigate = useNavigate();
   const [user, setUser] = useState(null);
 
@@ -43,9 +43,16 @@ const MeetingSandbox = () => {
     return <div>Loading...</div>;
   }
 
-  const startRecording = async () => {
+  const startRecording = async (e) => {
+    // Prevent default browser behavior for touch/mouse split events
+    if (e && e.preventDefault) e.preventDefault();
+
+    // If we are already initializing or recording, block duplicate triggers
+    if (isRecording || mediaRecorderRef.current?.state === "recording") {
+      return;
+    }
+
     try {
-      // Request microphone access with built-in hardware optimization
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: {
           echoCancellation: true,
@@ -53,51 +60,73 @@ const MeetingSandbox = () => {
           autoGainControl: true,
         },
       });
+
+      // Clear old tracks before starting clean
+      audioChunksRef.current = [];
+      setAudioUrl("");
       setStatus("Recording...");
       setIsRecording(true);
-      setAudioUrl(null); //Reset the player for the new recording
-      audioChunksRef.current = []; // Clear previous audio chunks
 
-      // Initialize the MediaRecorder instance with the microphone stream
-      const mediaRecorder = new MediaRecorder(stream);
-      mediaRecorderRef.current = mediaRecorder; // Store the instance in the ref
+      let options = { mimeType: "audio/webm;codecs=opus" };
+      if (!MediaRecorder.isTypeSupported(options.mimeType)) {
+        options = MediaRecorder.isTypeSupported("audio/webm")
+          ? { mimeType: "audio/webm" }
+          : {};
+      }
 
-      // Every time audio data becomes available, push it into our ref array
+      const mediaRecorder = new MediaRecorder(stream, options);
+      mediaRecorderRef.current = mediaRecorder;
+
       mediaRecorder.ondataavailable = (event) => {
         if (event.data && event.data.size > 0) {
           audioChunksRef.current.push(event.data);
+          // eslint-disable-next-line no-console
+          console.log(
+            `Chunk gathered: ${event.data.size} bytes. Total chunks: ${audioChunksRef.current.length}`,
+          );
         }
       };
 
-      // Start recording
-      mediaRecorder.start(200);
+      mediaRecorder.start(250); // Flush hardware buffers every 250ms
     } catch (error) {
-      setStatus(
-        "Error accessing microphone. Please allow access and try again.",
-      );
+      setStatus("Error accessing microphone.");
       console.error("Microphone access error:", error); // eslint-disable-line no-console
+      setIsRecording(false);
     }
   };
 
-  const stopRecording = () => {
+  const stopRecording = (e) => {
+    if (e && e.preventDefault) e.preventDefault();
+
+    // If we aren't actively recording, do nothing
     if (!isRecording || !mediaRecorderRef.current) return;
+
     setStatus("Processing audio...");
     setIsRecording(false);
 
-    // When recording stops, assemble the final binary blob
+    // Arm the handler first to ensure we capture the final chunks before the stream is killed
     mediaRecorderRef.current.onstop = async () => {
-      const audioBlob = new Blob(audioChunksRef.current, {
-        type: "audio/webm",
-      });
-
-      // Safely turn off the microphone hardware light now that the session is finalized
+      // Turn off microphone hardware stream lights immediately
       if (mediaRecorderRef.current.stream) {
         mediaRecorderRef.current.stream
           .getTracks()
           .forEach((track) => track.stop());
       }
 
-      // Generate a temporary browser playback URL for the audio player
+      console.log("Final chunk assembly count:", audioChunksRef.current.length); // eslint-disable-line no-console
+
+      const finalMimeType = mediaRecorderRef.current.mimeType || "audio/webm";
+      const audioBlob = new Blob(audioChunksRef.current, {
+        type: finalMimeType,
+      });
+
+      console.log("Final Assembled Blob Size:", audioBlob.size, "bytes"); // eslint-disable-line no-console
+
+      if (audioBlob.size === 0) {
+        setStatus("Error: Audio chunk array was empty.");
+        return;
+      }
+
       const playbackUrl = URL.createObjectURL(audioBlob);
       setAudioUrl(playbackUrl);
 
@@ -117,22 +146,21 @@ const MeetingSandbox = () => {
         const data = await response.json();
 
         if (response.ok) {
-          setTranscription(data.text || "No transcription returned.");
+          setTranscription(data.corrected_text || "No transcription returned.");
           setStatus("Idle");
         } else {
-          console.error("Audio processing error:", data); // eslint-disable-line no-console
-          setStatus(
-            `Error: ${data.error || "Unknown error during transcription."}`,
-          );
+          setStatus(`Error: ${data.detail || "Unknown backend error."}`);
         }
       } catch (error) {
         setStatus("Network error connecting to transcription pipeline.");
-        console.error("Audio processing error regarding API:", error); // eslint-disable-line no-console
+        console.error("API transmission exception:", error); // eslint-disable-line no-console
       }
     };
 
-    // Stop the MediaRecorder hardware process
-    mediaRecorderRef.current.stop();
+    // Safely trigger the hardware stop command now that the handler is armed
+    if (mediaRecorderRef.current.state !== "inactive") {
+      mediaRecorderRef.current.stop();
+    }
   };
 
   return (
@@ -152,26 +180,61 @@ const MeetingSandbox = () => {
       ) : (
         <div className="info-banner-success">
           <strong>Optimized Mode:</strong> Your unique speech mapping is fully
-          operational. Translations are now calibrated to your specific vocal
+          operational. Transcriptions are now calibrated to your specific vocal
           patterns.
         </div>
       )}
-      <p>Status: {status}</p>
+      <p className="workspace-status">
+        Status:{" "}
+        <span
+          className={`status-badge ${status.toLowerCase().replace("...", "").replace(" ", "-")}`}
+        >
+          {status}
+        </span>
+      </p>
 
       {/* Recording Workspace Layout */}
       <div className="recording-workspace">
-        <h3>Press and hold the button to stream or record audio</h3>
-
-        <button
-          onMouseDown={startRecording}
-          onMouseUp={stopRecording}
-          onTouchStart={startRecording}
-          onTouchEnd={stopRecording}
-          style={{ backgroundColor: isRecording ? "#dc3545" : "#007bff" }}
-        >
+        <p className="workspace-instruction">
           {isRecording
-            ? "🔴 Recording... (Release to stop)"
-            : "🎤 Hold to Talk"}
+            ? "Release to finalize and transcribe"
+            : "Press and hold to record audio"}
+        </p>
+        <button
+          onMouseDown={(e) => startRecording(e)}
+          onMouseUp={(e) => stopRecording(e)}
+          onTouchStart={(e) => startRecording(e)}
+          onTouchEnd={(e) => stopRecording(e)}
+          style={{ backgroundColor: isRecording ? "#dc2626" : "#7c3aed" }}
+        >
+          <span className="btn-icon">
+            {isRecording ? (
+              <span className="pulse-indicator" />
+            ) : (
+              /* Minimalist Microphone SVG */
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="mic-svg"
+              >
+                <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" />
+                <path d="M19 10v1a7 7 0 0 1-14 0v-1" />
+                <line x1="12" x2="12" y1="19" y2="22" />
+              </svg>
+            )}
+          </span>
+          <span className="btn-text">
+            {isRecording
+              ? "Listening..."
+              : audioUrl
+                ? "Re-try"
+                : "Hold to Talk"}
+          </span>
         </button>
 
         <div className="transcription-section">
@@ -191,7 +254,20 @@ const MeetingSandbox = () => {
       {audioUrl && (
         <div className="audio-review-section">
           <h3>Review Local Recording:</h3>
-          <audio src={audioUrl} controls />
+          <audio
+            src={audioUrl}
+            controls
+            onLoadedMetadata={(e) => {
+              // If duration is infinite/unknown, trick the browser into calculating it instantly
+              if (e.target.duration === Infinity || isNaN(e.target.duration)) {
+                e.target.currentTime = 1e10; // Fast forward to the end
+                e.target.onseeked = function () {
+                  e.target.currentTime = 0; // Snap right back to the beginning
+                  e.target.onseeked = null; // Unbind/kill the listener to avoid a loop
+                };
+              }
+            }}
+          />
         </div>
       )}
     </div>

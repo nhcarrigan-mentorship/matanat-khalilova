@@ -3,12 +3,17 @@ button {
   font-size: 1rem;
   color: white;
   border: none;
-  border-radius: 2rem;
+  border-radius: 1.5rem;
   cursor: pointer;
   transition: background-color 0.2s;
   width: auto;
   gap: 0.5rem; /* Puts clean spacing between emoji and text */
   white-space: nowrap; /* Guarantees the text never breaks to a new line */
+}
+
+button:hover:not(.is-active) {
+  background-color: #6d28d9; /* Darker Purple on Hover */
+  box-shadow: 0 10px 15px -3px rgba(124, 58, 237, 0.2);
 }
 
 .meeting-sandbox {
@@ -84,4 +89,92 @@ button {
 .audio-review-section {
   margin-top: 1.5rem;
   text-align: center;
+}
+
+.mic-svg {
+  width: 1.2rem;
+  height: 1.2rem;
+  color: #ffffff; /* Matches text color */
+  display: inline-block;
+  transition: transform 0.2s ease;
+  margin-right: 0.3rem; /* Space between icon and text */
+  vertical-align: middle; /* Ensures the icon is perfectly centered with the text */
+}
+
+.pulse-indicator {
+  width: 0.625rem; /* 10px */
+  height: 0.625rem; /* 10px */
+  background-color: #ffffff;
+  border-radius: 50%;
+  position: relative;
+  display: inline-block;
+  margin-right: 0.5rem; /* Space between pulse and text */
+}
+
+.pulse-indicator::after {
+  content: "";
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  top: 0;
+  left: 0;
+  background-color: #ffffff;
+  border-radius: 50%;
+  animation: core-pulse 1.4s infinite ease-out;
+}
+
+/* Base status layout */
+.workspace-status {
+  color: #4b5563; /* Muted gray for the label */
+  font-weight: 500;
+  margin: 1rem 0;
+}
+
+/* Individual state color states */
+.status-badge {
+  font-weight: 600;
+  transition: color 0.2s ease;
+}
+
+/* Gray when doing nothing */
+.status-badge.idle {
+  color: #6b7280;
+}
+
+/* Vibrant orange/yellow while capturing sound */
+.status-badge.recording {
+  color: #d97706;
+  animation: dynamic-pulse 1.5s infinite ease-in-out;
+}
+
+/* Deep purple or electric indigo while waiting on API/Llama responses */
+.status-badge.processing-audio {
+  color: #7c3aed;
+}
+
+/* Red for errors */
+.status-badge.error {
+  color: #dc2626;
+}
+
+/* Subtle pulse text animation for the active recording state */
+@keyframes dynamic-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.6;
+  }
+}
+
+@keyframes core-pulse {
+  0% {
+    transform: scale(1);
+    opacity: 0.6;
+  }
+  100% {
+    transform: scale(2.6);
+    opacity: 0;
+  }
 }

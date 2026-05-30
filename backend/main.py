@@ -429,7 +429,7 @@ async def consecutive_translation(
                 f"RAW TRANSCRIPTION:\n{raw_transcription}"
             )
 
-            llm_response = await groq_client.chat.completions.create(
+            llm_response = groq_client.chat.completions.create(
                 model="llama-3.1-8b-instant",
                 messages=[
                     {
