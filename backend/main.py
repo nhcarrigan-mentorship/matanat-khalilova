@@ -1,5 +1,7 @@
 import os
 import re
+import time
+from collections import defaultdict
 from datetime import datetime
 
 import bcrypt
@@ -7,7 +9,7 @@ import cloudinary
 import cloudinary.uploader
 from bson import ObjectId
 from dotenv import load_dotenv
-from fastapi import (  # status,
+from fastapi import (
     APIRouter,
     Depends,
     FastAPI,
@@ -17,6 +19,7 @@ from fastapi import (  # status,
     Request,
     Response,
     UploadFile,
+    status,
 )
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, EmailStr, field_validator
@@ -392,15 +395,45 @@ async def get_profile_status(current_user: dict = Depends(get_current_user)):
     return {"is_optimized": False, "has_patterns": False}
 
 
+# Simple global in-memory tracking dictionary (Reset when server restarts)
+# Structure: { user_id: [timestamp1, timestamp2, ...] }
+USER_REQUEST_LOGS = defaultdict(list)
+
+# Define limits: Max 5 requests every 10 seconds
+RATE_LIMIT_WINDOW_SECONDS = 10
+MAX_REQUESTS_PER_WINDOW = 5
+
+
 @app.post("/api/translate/instant")
 async def consecutive_translation(
     audio_file: UploadFile = File(...),
     current_user: dict = Depends(get_current_user),
 ):
+    actual_user_id = current_user["user"]["id"]
+    current_time = time.time()
+
+    # Security/Permissions: Rate Limiting Enforcement
+    # Clear out timestamps older than our threshold window
+    USER_REQUEST_LOGS[actual_user_id] = [
+        ts
+        for ts in USER_REQUEST_LOGS[actual_user_id]
+        if current_time - ts < RATE_LIMIT_WINDOW_SECONDS
+    ]
+
+    # Check if user has exceeded the safety threshold quota
+    if len(USER_REQUEST_LOGS[actual_user_id]) >= MAX_REQUESTS_PER_WINDOW:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Too many requests. Please wait a moment before recording again.",
+        )
+
+    # Log the valid request timestamp
+    USER_REQUEST_LOGS[actual_user_id].append(current_time)
+
     try:
         if not audio_file.filename.endswith((".wav", ".mp3", ".m4a", ".webm")):
             raise HTTPException(
-                status_code=400,
+                status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Unsupported file type. Please upload a valid audio file.",
             )
         # 1. Read the raw binary audio data from the frontend upload
@@ -416,7 +449,9 @@ async def consecutive_translation(
         )
 
         if not user_profile:
-            raise HTTPException(status_code=404, detail="User profile not found")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="User profile not found"
+            )
 
         # Extract the correction prompt rules from the user's profile
         correction_prompt = user_profile.get("correction_prompt", "")
@@ -462,7 +497,11 @@ async def consecutive_translation(
             "raw_transcription": raw_transcription,
             "corrected_text": corrected_text,
         }
+    except HTTPException:
+        # Let FastAPI's intentional HTTPExceptions bypass the catch-all block
+        raise
     except Exception as e:
         raise HTTPException(
-            status_code=500, detail=f"Error processing audio translation: {str(e)}"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error processing audio translation: {str(e)}",
         )
