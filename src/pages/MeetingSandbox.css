@@ -1,0 +1,185 @@
+.recording-trigger-btn {
+  padding: 0.5rem 1.2rem;
+  font-size: 1rem;
+  color: white;
+  border: none;
+  border-radius: 1.5rem;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  width: auto;
+  gap: 0.5rem; /* Puts clean spacing between emoji and text */
+  white-space: nowrap; /* Guarantees the text never breaks to a new line */
+}
+
+.recording-trigger-btn:hover:not(.is-active) {
+  background-color: #6d28d9; /* Darker Purple on Hover */
+  box-shadow: 0 10px 15px -3px rgba(124, 58, 237, 0.2);
+}
+
+#transcribed-text-output,
+#audio-review-title {
+  font-size: 1rem;
+}
+
+.meeting-sandbox {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 2rem;
+  margin: 0 auto;
+  font-family: sans-serif;
+  max-width: 50rem;
+}
+
+.link {
+  text-decoration: none;
+  color: #2828c2;
+  font-weight: 500;
+}
+
+.info-banner-warning {
+  background-color: #fff3cd;
+  color: #856404;
+  line-height: 1.5;
+  padding: 1rem;
+  border-radius: 0.5rem;
+  margin-bottom: 1rem;
+  margin-top: 1rem;
+}
+
+.info-banner-success {
+  background-color: #d4edda;
+  color: #155724;
+  line-height: 1.5;
+  padding: 1rem;
+  border-radius: 0.5rem;
+  margin-bottom: 1rem;
+  margin-top: 1rem;
+}
+
+.recording-workspace {
+  border: 1px solid #ccc;
+  padding: 2rem;
+  border-radius: 0.5rem;
+  text-align: center;
+}
+
+.transcription-output {
+  width: 100%;
+  box-sizing: border-box; /* Prevents padding from breaking width */
+  padding: 1rem;
+  font-size: 1rem;
+  font-family: inherit;
+  background-color: #f8f9fa;
+  border: 1px solid #e9ecef;
+  border-radius: 0.5rem;
+  resize: vertical; /* Allows users to pull down but not break layout width wise */
+  outline: none; /* Removes harsh blue outline on focus */
+  transition: border-color 0.2s;
+}
+
+.transcription-section {
+  margin-top: 2rem;
+  text-align: left;
+}
+
+/* When the textarea is locked, make it look disabled/inactive */
+.transcription-output[readonly] {
+  background-color: #e9ecef; /* Slightly darker gray */
+  color: #545b60; /* Muted text color */
+  cursor: not-allowed;
+  border-color: #ced4da;
+}
+
+.audio-review-section {
+  margin-top: 1.5rem;
+  text-align: center;
+}
+
+.mic-svg {
+  width: 1.2rem;
+  height: 1.2rem;
+  color: #ffffff; /* Matches text color */
+  display: inline-block;
+  transition: transform 0.2s ease;
+  margin-right: 0.3rem; /* Space between icon and text */
+  vertical-align: middle; /* Ensures the icon is perfectly centered with the text */
+}
+
+.pulse-indicator {
+  width: 0.625rem; /* 10px */
+  height: 0.625rem; /* 10px */
+  background-color: #ffffff;
+  border-radius: 50%;
+  position: relative;
+  display: inline-block;
+  margin-right: 0.5rem; /* Space between pulse and text */
+}
+
+.pulse-indicator::after {
+  content: "";
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  top: 0;
+  left: 0;
+  background-color: #ffffff;
+  border-radius: 50%;
+  animation: core-pulse 1.4s infinite ease-out;
+}
+
+/* Base status layout */
+.workspace-status {
+  color: #4b5563; /* Muted gray for the label */
+  font-weight: 500;
+  margin: 1rem 0;
+}
+
+/* Individual state color states */
+.status-badge {
+  font-weight: 600;
+  transition: color 0.2s ease;
+}
+
+/* Gray when doing nothing */
+.status-badge.idle {
+  color: #6b7280;
+}
+
+/* Vibrant orange/brown while capturing sound */
+.status-badge.recording {
+  color: #704513;
+  animation: dynamic-pulse 1.5s infinite ease-in-out;
+}
+
+/* Deep purple or electric indigo while waiting on API/Llama responses */
+.status-badge.processing-audio {
+  color: #7c3aed;
+}
+
+/* Red for errors */
+.status-badge.error {
+  color: #dc2626;
+}
+
+/* Subtle pulse text animation for the active recording state */
+@keyframes dynamic-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.8;
+  }
+}
+
+@keyframes core-pulse {
+  0% {
+    transform: scale(1);
+    opacity: 0.6;
+  }
+  100% {
+    transform: scale(2.6);
+    opacity: 0;
+  }
+}

@@ -79,6 +79,12 @@ const Dashboard = () => {
           </button>
         </div>
       )}
+      <button
+        onClick={() => navigate("/meeting-sandbox")}
+        className="sandbox-button"
+      >
+        Enter Meeting Sandbox
+      </button>
     </div>
   );
 };

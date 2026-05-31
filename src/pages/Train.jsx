@@ -182,11 +182,23 @@ const Train = () => {
 
         if (response.ok) {
           setUser(data.user);
+
+          // If they are already fully trained, don't make them re-train
+          // Send them directly forward to their voice profile.
+          if (
+            data.user &&
+            typeof data.user.is_trained !== "undefined" &&
+            data.user.is_trained === true
+          ) {
+            navigate("/voice-profile", { replace: true });
+          }
         } else {
           navigate("/login");
         }
       } catch (error) {
         console.error("Failed to fetch user data", error); // eslint-disable-line no-console
+        // Secure the fallback route in case of complete network/server failures
+        navigate("/login");
       }
     };
     fetchUser();
