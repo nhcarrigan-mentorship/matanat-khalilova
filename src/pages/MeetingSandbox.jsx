@@ -10,6 +10,8 @@ const MeetingSandbox = () => {
   const [audioUrl, setAudioUrl] = useState("");
   const navigate = useNavigate();
   const [user, setUser] = useState(null);
+  const [isStreamingMode, setIsStreamingMode] = useState(false);
+  const socketRef = useRef(null);
 
   const mediaRecorderRef = useRef(null); // Holds the active MediaRecorder instance
   const audioChunksRef = useRef([]); // Holds the raw binary audio array chunks
@@ -163,6 +165,46 @@ const MeetingSandbox = () => {
     }
   };
 
+  const startContinuousStreaming = () => {
+    setStatus("Connecting to live stream...");
+    setIsStreamingMode(true);
+
+    // Create the native browser WebSocket connection
+    const ws = new WebSocket("ws://localhost:8000/api/stream");
+    socketRef.current = ws;
+
+    ws.onopen = () => {
+      setStatus("Streaming Mode Active");
+      console.log("Frontend  connected to WebSocket successfully!"); // eslint-disable-line no-console
+
+      // sending a message to backend
+      ws.send("Hi Backend. The continuous bridge is officially open.");
+    };
+
+    ws.onmessage = (event) => {
+      console.log("Received message from backend socket:", event.data); // eslint-disable-line no-console
+      // Append the text directly into our text area to verify the bridge
+      setTranscription((prev) => prev + "\n[Server Echo]: " + event.data);
+    };
+
+    ws.onerror = (error) => {
+      console.error("WebSocket error observed:", error); // eslint-disable-line no-console
+      setStatus("Streaming connection error.");
+    };
+
+    ws.onclose = () => {
+      console.log("WebSocket bridge closed safely."); // eslint-disable-line no-console
+      setStatus("Idle");
+      setIsStreamingMode(false);
+    };
+  };
+
+  const stopContinuousStreaming = () => {
+    if (socketRef.current) {
+      socketRef.current.close(); // Safely close the pipe, which fires ws.onclose
+    }
+  };
+
   return (
     <div className="meeting-sandbox">
       <h2>🎙️ VoiceBridge Sandbox View</h2>
@@ -195,48 +237,134 @@ const MeetingSandbox = () => {
 
       {/* Recording Workspace Layout */}
       <div className="recording-workspace">
-        <p className="workspace-instruction">
-          {isRecording
-            ? "Release to finalize and transcribe"
-            : "Press and hold to record audio"}
-        </p>
-        <button
-          className="recording-trigger-btn"
-          onMouseDown={(e) => startRecording(e)}
-          onMouseUp={(e) => stopRecording(e)}
-          onTouchStart={(e) => startRecording(e)}
-          onTouchEnd={(e) => stopRecording(e)}
-          style={{ backgroundColor: isRecording ? "#dc2626" : "#7c3aed" }}
-        >
-          <span className="btn-icon">
-            {isRecording ? (
-              <span className="pulse-indicator" />
-            ) : (
-              /* Minimalist Microphone SVG */
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                className="mic-svg"
-              >
-                <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" />
-                <path d="M19 10v1a7 7 0 0 1-14 0v-1" />
-                <line x1="12" x2="12" y1="19" y2="22" />
-              </svg>
-            )}
-          </span>
-          <span className="btn-text">
+        {/* Mode 1: Consecutive Bursts (HTTP POST) */}
+        <div className="mode-container" style={{ marginBottom: "2rem" }}>
+          <p className="workspace-instruction">
             {isRecording
-              ? "Listening..."
-              : audioUrl
-                ? "Re-try"
-                : "Hold to Talk"}
-          </span>
-        </button>
+              ? "Release to finalize"
+              : "Mode A: Single Burst Speech (Instant)"}
+          </p>
+          <button
+            className="recording-trigger-btn btn-mode-a"
+            disabled={isStreamingMode || status === "Processing audio..."} // lock this button if streaming mode is on
+            onMouseDown={(e) => startRecording(e)}
+            onMouseUp={(e) => stopRecording(e)}
+            onTouchStart={(e) => startRecording(e)}
+            onTouchEnd={(e) => stopRecording(e)}
+            style={{ backgroundColor: isRecording ? "#dc2626" : "#7c3aed" }}
+          >
+            <span className="btn-icon">
+              {isRecording ? (
+                <span className="pulse-indicator" />
+              ) : (
+                /* Minimalist Microphone SVG */
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="mic-svg"
+                >
+                  <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" />
+                  <path d="M19 10v1a7 7 0 0 1-14 0v-1" />
+                  <line x1="12" x2="12" y1="19" y2="22" />
+                </svg>
+              )}
+            </span>
+            <span className="btn-text">
+              {isRecording
+                ? "Listening..."
+                : audioUrl
+                  ? "Re-try"
+                  : "Hold to Talk"}
+            </span>
+          </button>
+        </div>
+
+        {/* Mode 2: Continuous Streaming (WebSockets) */}
+        <div
+          className="mode-container"
+          style={{
+            marginBottom: "2rem",
+            borderTop: "1px dashed #ccc",
+            paddingTop: "1.5rem",
+          }}
+        >
+          <p className="workspace-instruction">
+            {isStreamingMode
+              ? "Continuous mode is active. Speak freely..."
+              : "Mode B: Continuous Streaming Speech (Hands-Free)"}
+          </p>
+          {!isStreamingMode ? (
+            <button
+              className="recording-trigger-btn btn-mode-b-start"
+              disabled={isRecording || status === "Processing audio..."} // Lock if push-to-talk is active
+              onClick={startContinuousStreaming}
+              style={{
+                backgroundColor: "#097d58",
+              }}
+            >
+              <span className="btn-icon">
+                {/* Sleek Minimalist Radio/Signal Tower SVG */}
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="mic-svg"
+                  style={{
+                    width: "1.125rem",
+                    height: "1.125rem",
+                    marginRight: "0.5rem",
+                    verticalAlign: "middle",
+                  }}
+                >
+                  <path d="M4.9 19.1C1 15.2 1 8.8 4.9 4.9M19.1 4.9c3.9 3.9 3.9 10.3 0 14.2M7.8 16.2c-2.3-2.3-2.3-6.1 0-8.5M16.2 7.8c2.3 2.3 2.3 6.1 0 8.5M12 12h.01" />
+                </svg>
+              </span>
+              <span className="btn-text" style={{ verticalAlign: "middle" }}>
+                Start Continuous Mode
+              </span>
+            </button>
+          ) : (
+            <button
+              className="recording-trigger-btn btn-mode-b-stop"
+              onClick={stopContinuousStreaming}
+              style={{ backgroundColor: "#dc2626" }}
+            >
+              <span className="btn-icon">
+                {/* Sleek Minimalist Stop Square SVG */}
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="mic-svg"
+                  style={{
+                    width: "1.125rem",
+                    height: "1.125rem",
+                    marginRight: "0.5rem",
+                    verticalAlign: "middle",
+                  }}
+                >
+                  <rect x="4" y="4" width="16" height="16" rx="2" />
+                </svg>
+              </span>
+              <span className="btn-text" style={{ verticalAlign: "middle" }}>
+                Finish & Stop Stream
+              </span>
+            </button>
+          )}
+        </div>
 
         <div className="transcription-section">
           <h3 id="transcribed-text-output">Live Output:</h3>

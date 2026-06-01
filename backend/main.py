@@ -19,6 +19,8 @@ from fastapi import (
     Request,
     Response,
     UploadFile,
+    WebSocket,
+    WebSocketDisconnect,
     status,
 )
 from fastapi.middleware.cors import CORSMiddleware
@@ -443,7 +445,6 @@ async def consecutive_translation(
             audio_bytes, filename=audio_file.filename
         )
         # 3. Query MongoDB for this authenticated user's profile correction_prompt
-        actual_user_id = current_user["user"]["id"]
         user_profile = await users_collection.find_one(
             {"_id": ObjectId(actual_user_id)}
         )
@@ -505,3 +506,24 @@ async def consecutive_translation(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error processing audio translation: {str(e)}",
         )
+
+
+@app.websocket("/api/stream")
+async def websocket_endpoint(websocket: WebSocket):
+    # Accept the incoming frontend connection request
+    await websocket.accept()
+    print("WebSocket Connection established successfully")
+
+    try:
+        while True:
+            # Wait for data to arrive over the socket line
+            # For this test, we expect the frontend to send text strings
+            data = await websocket.receive_text()
+            print(f"Received from client: {data}")
+
+            # Echo the data back to the frontend to prove the bridge works
+            await websocket.send_text(f"Server received your message: {data}")
+    except WebSocketDisconnect:
+        print("Client disconnected from WebSocket safely")
+    except Exception as e:
+        print(f"Unexpected WebSocket error occurred: {str(e)}")
