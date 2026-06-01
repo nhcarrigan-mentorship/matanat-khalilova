@@ -165,41 +165,88 @@ const MeetingSandbox = () => {
     }
   };
 
-  const startContinuousStreaming = () => {
+  const startContinuousStreaming = async () => {
     setStatus("Connecting to live stream...");
     setIsStreamingMode(true);
 
-    // Create the native browser WebSocket connection
-    const ws = new WebSocket("ws://localhost:8000/api/stream");
-    socketRef.current = ws;
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+        },
+      });
 
-    ws.onopen = () => {
-      setStatus("Streaming Mode Active");
-      console.log("Frontend  connected to WebSocket successfully!"); // eslint-disable-line no-console
+      // Create the native browser WebSocket connection
+      const ws = new WebSocket("ws://localhost:8000/api/stream");
+      socketRef.current = ws;
 
-      // sending a message to backend
-      ws.send("Hi Backend. The continuous bridge is officially open.");
-    };
+      ws.onopen = () => {
+        setStatus("Streaming Mode Active");
+        // eslint-disable-next-line no-console
+        console.log(
+          "Frontend connected to WebSocket successfully! Starting audio recording...",
+        );
 
-    ws.onmessage = (event) => {
-      console.log("Received message from backend socket:", event.data); // eslint-disable-line no-console
-      // Append the text directly into our text area to verify the bridge
-      setTranscription((prev) => prev + "\n[Server Echo]: " + event.data);
-    };
+        let options = { mimeType: "audio/webm;codecs=opus" };
+        if (!MediaRecorder.isTypeSupported(options.mimeType)) {
+          options = MediaRecorder.isTypeSupported("audio/webm")
+            ? { mimeType: "audio/webm" }
+            : {};
+        }
 
-    ws.onerror = (error) => {
-      console.error("WebSocket error observed:", error); // eslint-disable-line no-console
-      setStatus("Streaming connection error.");
-    };
+        const mediaRecorder = new MediaRecorder(stream, options);
+        mediaRecorderRef.current = mediaRecorder;
 
-    ws.onclose = () => {
-      console.log("WebSocket bridge closed safely."); // eslint-disable-line no-console
-      setStatus("Idle");
+        mediaRecorder.ondataavailable = async (event) => {
+          if (
+            event.data &&
+            event.data.size > 0 &&
+            ws.readyState === WebSocket.OPEN
+          ) {
+            // Send the raw binary chunk straight over the WebSocket pipe
+            ws.send(event.data);
+            // eslint-disable-next-line no-console
+            console.log(
+              `Blasted audio chunk down the pipe: ${event.data.size} bytes`,
+            );
+          }
+        };
+        // Start recording and tell it to cut a chunk exactly every 2 seconds
+        mediaRecorder.start(2000);
+      };
+
+      ws.onmessage = (event) => {
+        console.log("Received message from backend socket:", event.data); // eslint-disable-line no-console
+        // Append the text directly into our text area to verify the bridge
+        setTranscription((prev) => prev + "\n" + event.data);
+      };
+
+      ws.onerror = (error) => {
+        console.error("WebSocket error observed:", error); // eslint-disable-line no-console
+        setStatus("Streaming connection error.");
+      };
+
+      ws.onclose = () => {
+        console.log("WebSocket bridge closed safely."); // eslint-disable-line no-console
+        setStatus("Idle");
+        setIsStreamingMode(false);
+      };
+    } catch (error) {
+      setStatus("Error accessing microphone.");
+      console.error("Microphone setup failed:", error); // eslint-disable-line no-console
       setIsStreamingMode(false);
-    };
+    }
   };
 
   const stopContinuousStreaming = () => {
+    // Turn off the microphone hardware stream tracks if active
+    if (mediaRecorderRef.current && mediaRecorderRef.current.stream) {
+      mediaRecorderRef.current.stream
+        .getTracks()
+        .forEach((track) => track.stop());
+    }
     if (socketRef.current) {
       socketRef.current.close(); // Safely close the pipe, which fires ws.onclose
     }

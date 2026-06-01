@@ -518,11 +518,13 @@ async def websocket_endpoint(websocket: WebSocket):
         while True:
             # Wait for data to arrive over the socket line
             # For this test, we expect the frontend to send text strings
-            data = await websocket.receive_text()
-            print(f"Received from client: {data}")
+            data = await websocket.receive_bytes()
+            print(f"Received binary audio chunk from client: {len(data)} bytes")
 
             # Echo the data back to the frontend to prove the bridge works
-            await websocket.send_text(f"Server received your message: {data}")
+            await websocket.send_text(
+                f"Server successfully received {len(data)} bytes of audio data."
+            )
     except WebSocketDisconnect:
         print("Client disconnected from WebSocket safely")
     except Exception as e:
