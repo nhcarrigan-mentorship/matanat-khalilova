@@ -1,3 +1,4 @@
+import io
 import os
 import re
 import time
@@ -7,6 +8,8 @@ from datetime import datetime
 import bcrypt
 import cloudinary
 import cloudinary.uploader
+import numpy as np
+import torch
 from bson import ObjectId
 from dotenv import load_dotenv
 from fastapi import (
@@ -25,6 +28,7 @@ from fastapi import (
 )
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, EmailStr, field_validator
+from pydub import AudioSegment
 
 from audio_utils import process_voice_profile_training, transcribe_audio_bytes
 from auth_utils import create_access_token, verify_access_token
@@ -35,6 +39,16 @@ router = APIRouter()
 
 # Load environment variables from .env file
 load_dotenv()
+
+# Load the local Silero VAD model and utility function
+models, utils = torch.hub.load(
+    repo_or_dir="snakers4/silero-vad",
+    model="silero_vad",
+    force_reload=False,
+    trust_repo=True,
+)
+
+(get_speech_timestamps, save_audio, read_audio, VADIterator, collect_chunks) = utils
 
 cloudinary.config(
     cloud_name=os.getenv("CLOUDINARY_CLOUD_NAME"),
@@ -508,22 +522,71 @@ async def consecutive_translation(
         )
 
 
+def decode_audio_buffer(buffer_bytes: bytearray) -> np.ndarray:
+    """
+    Takes raw WebM audio bytes from the memory buffer,
+    decodes them via ffmpeg,
+    and returns a normalized Float32 numpy array at 16kHz Mono.
+    """
+
+    if (len(buffer_bytes)) == 0:
+        return np.array([], dtype=np.float32)
+
+    try:
+        # Wrap the raw bytes in an in-memory file-like object
+        audio_file = io.BytesIO(buffer_bytes)
+
+        # Use pydub (driven by ffmpeg) to read the WebM container
+        audio_segment = AudioSegment.from_file(audio_file, format="webm")
+
+        # Enforce the exact constraints required by VAD/Whisper (16kHz, Mono)
+        audio_segment = audio_segment.set_frame_rate(16000).set_channels(1)
+
+        # Convert raw binary samples into a numpy numerical array
+        samples = np.array(audio_segment.get_array_of_samples(), dtype=np.float32)
+
+        # Normalize audio data from integers to floats between -1.0 and 1.0
+        # (16-bit audio max amplitude is 32768)
+        normalized_samples = samples / 32768.0
+
+        return normalized_samples
+
+    except Exception as e:
+        print(f"Error decoding audio buffer layout: {str(e)}")
+        return np.array([], dtype=np.float32)
+
+
 @app.websocket("/api/stream")
 async def websocket_endpoint(websocket: WebSocket):
     # Accept the incoming frontend connection request
     await websocket.accept()
     print("WebSocket Connection established successfully")
 
+    # Initialize an empty bytearray to accumulate incoming audio chunks
+    audio_buffer = bytearray()
+
     try:
         while True:
             # Wait for data to arrive over the socket line
             # For this test, we expect the frontend to send text strings
             data = await websocket.receive_bytes()
-            print(f"Received binary audio chunk from client: {len(data)} bytes")
 
+            # Append the new 2-second binary chunk to our master buffer
+            audio_buffer.extend(data)
+
+            # Test Decoding: Convert the current full buffer into raw numbers
+            pcm_data = decode_audio_buffer(audio_buffer)
+
+            print(
+                f"Received chunk: {len(data)} bytes. "
+                f"Master buffer total: {len(audio_buffer)} bytes."
+            )
+
+            print(f"Decoded PCM data points: {len(pcm_data)}")
             # Echo the data back to the frontend to prove the bridge works
             await websocket.send_text(
-                f"Server successfully received {len(data)} bytes of audio data."
+                f"Server gathered chunk. Accumulator at {len(audio_buffer)} bytes."
+                f"Server decoded buffer into {len(pcm_data)} audio points."
             )
     except WebSocketDisconnect:
         print("Client disconnected from WebSocket safely")
