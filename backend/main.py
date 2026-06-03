@@ -529,7 +529,7 @@ def decode_audio_buffer(buffer_bytes: bytearray) -> np.ndarray:
     and returns a normalized Float32 numpy array at 16kHz Mono.
     """
 
-    if (len(buffer_bytes)) == 0:
+    if len(buffer_bytes) == 0:
         return np.array([], dtype=np.float32)
 
     try:
@@ -579,13 +579,13 @@ async def websocket_endpoint(websocket: WebSocket):
 
             print(
                 f"Received chunk: {len(data)} bytes. "
-                f"Master buffer total: {len(audio_buffer)} bytes."
+                f"Master buffer total: {len(audio_buffer)} bytes. "
+                f"Decoded PCM data points: {len(pcm_data)}"
             )
 
-            print(f"Decoded PCM data points: {len(pcm_data)}")
             # Echo the data back to the frontend to prove the bridge works
             await websocket.send_text(
-                f"Server gathered chunk. Accumulator at {len(audio_buffer)} bytes."
+                f"Server gathered chunk. Accumulator at {len(audio_buffer)} bytes. "
                 f"Server decoded buffer into {len(pcm_data)} audio points."
             )
     except WebSocketDisconnect:
