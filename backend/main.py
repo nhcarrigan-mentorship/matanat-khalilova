@@ -2,6 +2,7 @@ import io
 import os
 import re
 import time
+import wave
 from collections import defaultdict
 from datetime import datetime
 
@@ -28,7 +29,6 @@ from fastapi import (
 )
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, EmailStr, field_validator
-from pydub import AudioSegment
 
 from audio_utils import process_voice_profile_training, transcribe_audio_bytes
 from auth_utils import create_access_token, verify_access_token
@@ -41,7 +41,8 @@ router = APIRouter()
 load_dotenv()
 
 # Load the local Silero VAD model and utility function
-models, utils = torch.hub.load(
+# (This downloads the model on the first startup, then reads from cache)
+VAD_MODEL, utils = torch.hub.load(
     repo_or_dir="snakers4/silero-vad",
     model="silero_vad",
     force_reload=False,
@@ -522,73 +523,106 @@ async def consecutive_translation(
         )
 
 
-def decode_audio_buffer(buffer_bytes: bytearray) -> np.ndarray:
-    """
-    Takes raw WebM audio bytes from the memory buffer,
-    decodes them via ffmpeg,
-    and returns a normalized Float32 numpy array at 16kHz Mono.
-    """
+vad_iterator = VADIterator(
+    VAD_MODEL, sampling_rate=16000, threshold=0.4
+)  # Slightly lower threshold for crisp speech capture
 
-    if len(buffer_bytes) == 0:
-        return np.array([], dtype=np.float32)
 
-    try:
-        # Wrap the raw bytes in an in-memory file-like object
-        audio_file = io.BytesIO(buffer_bytes)
+def convert_raw_pcm_to_wav(pcm_array: np.ndarray) -> bytes:
+    """Converts raw float32 PCM data directly into pristine WAV bytes for Groq"""
+    # Force conversion to a true NumPy array immediately to guarantee .tobytes() exists
+    pcm_array = np.asarray(pcm_array, dtype=np.float32)
 
-        # Use pydub (driven by ffmpeg) to read the WebM container
-        audio_segment = AudioSegment.from_file(audio_file, format="webm")
+    # Denormalize floats back to 16-bit integers (-32768 to 32767)
+    int_samples = np.clip(pcm_array, -1.0, 1.0) * 32767.0
+    int_samples = int_samples.astype(np.int16)
 
-        # Enforce the exact constraints required by VAD/Whisper (16kHz, Mono)
-        audio_segment = audio_segment.set_frame_rate(16000).set_channels(1)
+    wav_io = io.BytesIO()
+    with wave.open(wav_io, "wb") as wav_file:
+        wav_file.setnchannels(1)  # Mono
+        wav_file.setsampwidth(2)  # 16-bit audio = 2 bytes per sample
+        wav_file.setframerate(16000)  # 16kHz
+        wav_file.writeframes(int_samples.tobytes())
 
-        # Convert raw binary samples into a numpy numerical array
-        samples = np.array(audio_segment.get_array_of_samples(), dtype=np.float32)
-
-        # Normalize audio data from integers to floats between -1.0 and 1.0
-        # (16-bit audio max amplitude is 32768)
-        normalized_samples = samples / 32768.0
-
-        return normalized_samples
-
-    except Exception as e:
-        print(f"Error decoding audio buffer layout: {str(e)}")
-        return np.array([], dtype=np.float32)
+    return wav_io.getvalue()
 
 
 @app.websocket("/api/stream")
 async def websocket_endpoint(websocket: WebSocket):
-    # Accept the incoming frontend connection request
     await websocket.accept()
-    print("WebSocket Connection established successfully")
+    print("WebSocket Connection established successfully via raw PCM")
 
-    # Initialize an empty bytearray to accumulate incoming audio chunks
-    audio_buffer = bytearray()
+    # Pure numeric list to hold our incoming samples linearly
+    master_pcm_stream = []
+
+    # Strictly independent timeline pointers
+    vad_pointer = 0  # Tracks exactly how far the VAD has processed chronologically
+    sentence_start = 0  # Tracks the starting index of our active verbal sentence
+    window_size = 512  # For a 16kHz stream, VAD expects exactly 512 samples at a time
 
     try:
         while True:
-            # Wait for data to arrive over the socket line
-            # For this test, we expect the frontend to send text strings
+            # Catch raw incoming binary array directly from the browser mic
             data = await websocket.receive_bytes()
+            if not data:
+                continue
 
-            # Append the new 2-second binary chunk to our master buffer
-            audio_buffer.extend(data)
+            # Convert raw bytes directly to float32 numbers (No decoding required)
+            incoming_samples = np.frombuffer(data, dtype=np.float32)
+            master_pcm_stream.extend(incoming_samples)
 
-            # Test Decoding: Convert the current full buffer into raw numbers
-            pcm_data = decode_audio_buffer(audio_buffer)
+            sentence_detected = False
+            sentence_end = 0
 
-            print(
-                f"Received chunk: {len(data)} bytes. "
-                f"Master buffer total: {len(audio_buffer)} bytes. "
-                f"Decoded PCM data points: {len(pcm_data)}"
-            )
+            # Step-by-step processing through our linear stream
+            # VAD only processes truly brand-new samples that just arrived
+            while vad_pointer + window_size <= len(master_pcm_stream):
+                window = master_pcm_stream[vad_pointer : vad_pointer + window_size]
+                vad_pointer += window_size
 
-            # Echo the data back to the frontend to prove the bridge works
-            await websocket.send_text(
-                f"Server gathered chunk. Accumulator at {len(audio_buffer)} bytes. "
-                f"Server decoded buffer into {len(pcm_data)} audio points."
-            )
+                speech_dict = vad_iterator(torch.from_numpy(np.array(window)))
+
+                if speech_dict and "end" in speech_dict:
+                    print(f"[VAD] Clean Human Pause Detected at sample {vad_pointer}")
+                    sentence_detected = True
+                    sentence_end = vad_pointer
+                    break  # Break out to dispatch this audio segment to Groq
+
+            if sentence_detected:
+                """
+                Slice strictly from where this sentence began to
+                where the VAD spotted the pause
+                """
+                current_sentence = np.array(
+                    master_pcm_stream[sentence_start:sentence_end], dtype=np.float32
+                )
+                """
+                Enforce a healthier minimum audio length
+                (~0.5 seconds) to avoid processing background clicks
+                """
+                if len(current_sentence) > 8000:
+                    wav_bytes = convert_raw_pcm_to_wav(current_sentence)
+                    print(
+                        f"Sending segment ({len(current_sentence)} samples) to Groq..."
+                    )
+                    raw_transcription = await transcribe_audio_bytes(
+                        wav_bytes, filename="sentence.wav"
+                    )
+
+                    if raw_transcription.strip() and raw_transcription.strip() != ".":
+                        print(f"Groq Live Transcription: {raw_transcription}")
+                        await websocket.send_text(f"TRANSCRIPT:{raw_transcription}")
+
+                # Set the start marker for next sentence right where this one finished
+                sentence_start = sentence_end
+                vad_iterator.reset_states()
+                continue
+
+            await websocket.send_text("STREAMING:processing_audio")
+
     except WebSocketDisconnect:
         print("Client disconnected from WebSocket safely")
     except Exception as e:
         print(f"Unexpected WebSocket error occurred: {str(e)}")
+    finally:
+        vad_iterator.reset_states()

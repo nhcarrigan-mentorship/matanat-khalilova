@@ -8,6 +8,7 @@ const MeetingSandbox = () => {
   const [isRecording, setIsRecording] = useState(false);
   const [status, setStatus] = useState("Idle");
   const [audioUrl, setAudioUrl] = useState("");
+  const [isTransitioning, setIsTransitioning] = useState(false);
   const navigate = useNavigate();
   const [user, setUser] = useState(null);
   const [isStreamingMode, setIsStreamingMode] = useState(false);
@@ -15,6 +16,8 @@ const MeetingSandbox = () => {
 
   const mediaRecorderRef = useRef(null); // Holds the active MediaRecorder instance
   const audioChunksRef = useRef([]); // Holds the raw binary audio array chunks
+  const audioContextRef = useRef(null);
+  const processorRef = useRef(null);
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -166,8 +169,10 @@ const MeetingSandbox = () => {
   };
 
   const startContinuousStreaming = async () => {
+    if (isTransitioning) return;
+
+    setIsTransitioning(true); // Lock the button during initialization phase
     setStatus("Connecting to live stream...");
-    setIsStreamingMode(true);
 
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
@@ -184,71 +189,92 @@ const MeetingSandbox = () => {
 
       ws.onopen = () => {
         setStatus("Streaming Mode Active");
+        setIsTransitioning(false); // Unlock now - the button is now a safe "Finish" toggle
+        setIsStreamingMode(true);
         // eslint-disable-next-line no-console
         console.log(
-          "Frontend connected to WebSocket successfully! Starting audio recording...",
+          "Frontend connected to WebSocket successfully! Starting PCM audio stream...",
         );
 
-        let options = { mimeType: "audio/webm;codecs=opus" };
-        if (!MediaRecorder.isTypeSupported(options.mimeType)) {
-          options = MediaRecorder.isTypeSupported("audio/webm")
-            ? { mimeType: "audio/webm" }
-            : {};
-        }
+        // Initialize Native AudioContext forced to 16kHz
+        const audioContext = new (
+          window.AudioContext || window.webkitAudioContext
+        )({ sampleRate: 16000 });
+        audioContextRef.current = audioContext;
 
-        const mediaRecorder = new MediaRecorder(stream, options);
-        mediaRecorderRef.current = mediaRecorder;
+        const source = audioContext.createMediaStreamSource(stream);
 
-        mediaRecorder.ondataavailable = async (event) => {
-          if (
-            event.data &&
-            event.data.size > 0 &&
-            ws.readyState === WebSocket.OPEN
-          ) {
-            // Send the raw binary chunk straight over the WebSocket pipe
-            ws.send(event.data);
-            // eslint-disable-next-line no-console
-            console.log(
-              `Blasted audio chunk down the pipe: ${event.data.size} bytes`,
-            );
+        // Create a script processor to capture raw 32-bit floating point PCM nodes
+        // Buffer size of 4096 samples provides a stable balance of latency and performance
+        const processor = audioContext.createScriptProcessor(4096, 1, 1);
+        processorRef.current = processor;
+
+        source.connect(processor);
+        processor.connect(audioContext.destination);
+
+        // Store the stream on a ref so stopContinuousStreaming can access its tracks
+        mediaRecorderRef.current = { stream };
+
+        processor.onaudioprocess = (e) => {
+          if (ws.readyState === WebSocket.OPEN) {
+            // Grab the raw numeric float32 sound wave channel data
+            const leftChannel = e.inputBuffer.getChannelData(0);
+
+            // Send the pure raw numbers directly down the pipe (No WebM/FFmpeg containers!)
+            ws.send(leftChannel.buffer);
           }
         };
-        // Start recording and tell it to cut a chunk exactly every 2 seconds
-        mediaRecorder.start(2000);
       };
 
       ws.onmessage = (event) => {
         console.log("Received message from backend socket:", event.data); // eslint-disable-line no-console
-        // Append the text directly into our text area to verify the bridge
         setTranscription((prev) => prev + "\n" + event.data);
       };
 
       ws.onerror = (error) => {
         console.error("WebSocket error observed:", error); // eslint-disable-line no-console
         setStatus("Streaming connection error.");
+        setIsTransitioning(false); // Make sure to unlock if the connection fails
+        setIsStreamingMode(false); // Protect the UI layout if connection drops abruptly
       };
 
       ws.onclose = () => {
         console.log("WebSocket bridge closed safely."); // eslint-disable-line no-console
         setStatus("Idle");
+        setIsTransitioning(false); // Unlock for the next session
         setIsStreamingMode(false);
       };
     } catch (error) {
       setStatus("Error accessing microphone.");
       console.error("Microphone setup failed:", error); // eslint-disable-line no-console
+      setIsTransitioning(false); // Unlock on error
       setIsStreamingMode(false);
     }
   };
 
   const stopContinuousStreaming = () => {
-    // Turn off the microphone hardware stream tracks if active
+    if (isTransitioning) return;
+
+    setIsTransitioning(true); // Lock the button while winding down hardware
+    setStatus("Disconnecting cleanly...");
+    // 1. Turn off the microphone hardware tracks
     if (mediaRecorderRef.current && mediaRecorderRef.current.stream) {
       mediaRecorderRef.current.stream
         .getTracks()
         .forEach((track) => track.stop());
     }
+
+    // 2. Disconnect and close the AudioContext pipeline safely
+    if (processorRef.current) {
+      processorRef.current.disconnect();
+    }
+    if (audioContextRef.current) {
+      audioContextRef.current.close();
+    }
+
+    // 3. Close the WebSocket connection
     if (socketRef.current) {
-      socketRef.current.close(); // Safely close the pipe, which fires ws.onclose
+      socketRef.current.close();
     }
   };
 
@@ -348,7 +374,11 @@ const MeetingSandbox = () => {
           {!isStreamingMode ? (
             <button
               className="recording-trigger-btn btn-mode-b-start"
-              disabled={isRecording || status === "Processing audio..."} // Lock if push-to-talk is active
+              disabled={
+                isRecording ||
+                isTransitioning ||
+                status === "Processing audio..."
+              } // Lock if push-to-talk is active
               onClick={startContinuousStreaming}
               style={{
                 backgroundColor: "#097d58",
