@@ -52,7 +52,7 @@ VAD_MODEL, utils = torch.hub.load(
     trust_repo=True,
 )
 
-(get_speech_timestamps, save_audio, read_audio, VADIterator, collect_chunks) = utils
+get_speech_timestamps, save_audio, read_audio, VADIterator, collect_chunks = utils
 
 cloudinary.config(
     cloud_name=os.getenv("CLOUDINARY_CLOUD_NAME"),
