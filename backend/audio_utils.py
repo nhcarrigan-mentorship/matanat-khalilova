@@ -235,18 +235,14 @@ async def process_voice_profile_training(user_id: str) -> dict:
         )
 
         correction_prompt = (
-            f"You are a speech correction assistant for a user with dysarthric speech. "
-            f"Whisper speech recognition consistently mishears this specific user. "
-            f"Below are known patterns where the left side is what Whisper heard "
-            f"and the right side is what the user actually meant: {map_str}. "
-            f"When given a raw Whisper transcription, use these patterns AND "
-            f"contextual reasoning to rewrite it as natural, grammatically "
-            f"correct English. If a word sounds phonetically similar "
-            f"to a known pattern, apply the correction. "
-            f"IMPORTANT: The user speaks English only. If Whisper outputs foreign "
-            f"language text, it is a hallucination — the user was speaking English. "
-            f"Preserve the user's intended meaning above all else. "
-            f"Return only the corrected text, nothing else."
+            f"USER SPEECH PROFILE:\n"
+            f"- Diagnosis: Dysarthric speech patterns.\n"
+            f"- Target Language: 100% English only.\n"
+            f"- Known Whisper Mishearing Dictionary:\n{map_str}\n\n"
+            f"INSTRUCTION: Map any distorted, "
+            f"foreign-looking phonetic words in the raw text "
+            f"to their closest semantic or English "
+            f"equivalent using the dictionary above."
         )
 
     return {
@@ -255,6 +251,65 @@ async def process_voice_profile_training(user_id: str) -> dict:
         "correction_map": master_correction_map,
         "correction_prompt": correction_prompt,
     }
+
+
+def refine_transcription(raw_transcription: str, correction_prompt: str) -> str:
+    """Refines raw text using Llama-3.1-8b based on the user's speech rules profile"""
+    if not correction_prompt or not raw_transcription.strip():
+        return raw_transcription
+
+    from audio_utils import groq_client
+
+    user_content = (
+        f"SPEECH PROFILE RULES:\n{correction_prompt}\n\n"
+        f"RAW TRANSCRIPTION:\n{raw_transcription}"
+    )
+
+    llm_response = groq_client.chat.completions.create(
+        model="llama-3.1-8b-instant",
+        messages=[
+            {
+                "role": "system",
+                "content": (
+                    "You are an AI Assistive Speech Refiner operating "
+                    "in an automated real-time pipeline.\n\n"
+                    "YOUR COGNITIVE PIPELINE:\n"
+                    "1. Analyze the USER SPEECH PROFILE dictionary rules.\n"
+                    "2. Read the RAW TRANSCRIPTION.\n"
+                    "3. Clean up stutters, repetitions, and replace "
+                    "misheard phonetic words with the correct English "
+                    "words based on the profile.\n"
+                    "4. Output ONLY the finalized clean English string.\n\n"
+                    "CRITICAL COMPLIANCE RULES:\n"
+                    "- DO NOT think out loud. Never write things like "
+                    "'X sounds phonetically similar to Y'.\n"
+                    "- DO NOT discuss rules, phonetics, grammar, "
+                    "or provide explanations.\n"
+                    "- NEVER swap or substitute valid English nouns for "
+                    "synonyms (e.g., never change 'guys' to 'boys' or "
+                    "'men') just to make a sentence sound more formal or "
+                    "structured. If the raw word is a valid English "
+                    "word, leave it exactly as it is unless a strict "
+                    "rule overrides it.\n"
+                    "- CRITICAL: Whisper will frequently hallucinate "
+                    "foreign characters (like tól, Gæst, Bóið) when "
+                    "processing dysarthric audio. The user CANNOT "
+                    "speak these languages. Treat these foreign tokens "
+                    "as distorted English words. Translate or match "
+                    "them back to standard English or the provided "
+                    "dictionary rules. Never output a foreign word.\n"
+                    "- If a sentence is already correct English "
+                    "(e.g., 'I am happy with you guys.'), "
+                    "do not change any nouns.\n\n"
+                    "OUTPUT FORMAT: Return ONLY the final corrected "
+                    "English text string. Absolutely no other text."
+                ),
+            },
+            {"role": "user", "content": user_content},
+        ],
+        temperature=0.1,
+    )
+    return llm_response.choices[0].message.content.strip()
 
 
 # TODO: Future enhancement — phonetic matching using jellyfish

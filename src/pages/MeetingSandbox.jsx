@@ -13,11 +13,13 @@ const MeetingSandbox = () => {
   const [user, setUser] = useState(null);
   const [isStreamingMode, setIsStreamingMode] = useState(false);
   const socketRef = useRef(null);
+  const textareaRef = useRef(null);
 
   const mediaRecorderRef = useRef(null); // Holds the active MediaRecorder instance
   const audioChunksRef = useRef([]); // Holds the raw binary audio array chunks
   const audioContextRef = useRef(null);
   const processorRef = useRef(null);
+  const localStreamRef = useRef(null);
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -42,6 +44,15 @@ const MeetingSandbox = () => {
     };
     checkAuth();
   }, [navigate]);
+
+  useEffect(() => {
+    if (textareaRef.current) {
+      // Take the top position of our view window, and push it down by
+      // the exact total height of the entire text body
+      // Force the element's internal scroll position to equal its maximum content height
+      textareaRef.current.scrollTop = textareaRef.current.scrollHeight;
+    }
+  }, [transcription]); // Fires instantly every time new text lands
 
   // If user data is not yet loaded, show a loading message
   if (!user) {
@@ -171,6 +182,7 @@ const MeetingSandbox = () => {
   const startContinuousStreaming = async () => {
     if (isTransitioning) return;
 
+    setTranscription("");
     setIsTransitioning(true); // Lock the button during initialization phase
     setStatus("Connecting to live stream...");
 
@@ -182,7 +194,7 @@ const MeetingSandbox = () => {
           autoGainControl: true,
         },
       });
-
+      localStreamRef.current = stream;
       // Create the native browser WebSocket connection
       const ws = new WebSocket("ws://localhost:8000/api/stream");
       socketRef.current = ws;
@@ -193,7 +205,7 @@ const MeetingSandbox = () => {
         setIsStreamingMode(true);
         // eslint-disable-next-line no-console
         console.log(
-          "Frontend connected to WebSocket successfully! Starting PCM audio stream...",
+          "Frontend connected to WebSocket successfully. Starting PCM audio stream...",
         );
 
         // Initialize Native AudioContext forced to 16kHz
@@ -220,13 +232,19 @@ const MeetingSandbox = () => {
             // Grab the raw numeric float32 sound wave channel data
             const leftChannel = e.inputBuffer.getChannelData(0);
 
-            // Send the pure raw numbers directly down the pipe (No WebM/FFmpeg containers!)
+            // Send the pure raw numbers directly down the pipe (No WebM/FFmpeg containers)
             ws.send(leftChannel.buffer);
           }
         };
       };
 
       ws.onmessage = (event) => {
+        if (event.data === "SYSTEM:AUTO_STOP") {
+          // eslint-disable-next-line no-console
+          console.log("Received auto-stop from server due to silence");
+          stopContinuousStreaming(); // This now safely shuts down the mic hardware too
+          return;
+        }
         console.log("Received message from backend socket:", event.data); // eslint-disable-line no-console
         setTranscription((prev) => prev + "\n" + event.data);
       };
@@ -252,30 +270,48 @@ const MeetingSandbox = () => {
     }
   };
 
-  const stopContinuousStreaming = () => {
+  const stopContinuousStreaming = async () => {
     if (isTransitioning) return;
 
     setIsTransitioning(true); // Lock the button while winding down hardware
     setStatus("Disconnecting cleanly...");
     // 1. Turn off the microphone hardware tracks
+    if (localStreamRef.current) {
+      localStreamRef.current.getTracks().forEach((track) => {
+        track.stop();
+        console.log("Mic live stream track stopped safely"); // eslint-disable-line no-console
+      });
+      localStreamRef.current = null;
+    }
+
+    // Fallback fallback just in case consecutive mode used the mediaRecorder
     if (mediaRecorderRef.current && mediaRecorderRef.current.stream) {
       mediaRecorderRef.current.stream
         .getTracks()
         .forEach((track) => track.stop());
+      mediaRecorderRef.current = null;
     }
-
     // 2. Disconnect and close the AudioContext pipeline safely
     if (processorRef.current) {
       processorRef.current.disconnect();
+      processorRef.current = null;
     }
     if (audioContextRef.current) {
-      audioContextRef.current.close();
+      // .close() returns a promise; awaiting it ensures hardware is released before moving on
+      if (audioContextRef.current.state !== "closed") {
+        await audioContextRef.current.close();
+      }
+      audioContextRef.current = null;
     }
 
     // 3. Close the WebSocket connection
     if (socketRef.current) {
       socketRef.current.close();
+      socketRef.current = null;
     }
+    setIsRecording(false); // Turns button from Red back to Green
+    setIsTransitioning(false); // Releases the button click lock
+    setStatus("Idle");
   };
 
   return (
@@ -447,11 +483,14 @@ const MeetingSandbox = () => {
           <h3 id="transcribed-text-output">Live Output:</h3>
           <textarea
             className="transcription-output"
+            ref={textareaRef}
             cols={60}
             value={transcription}
             placeholder="Your transcribed text will appear here in real-time..."
-            rows={5}
-            readOnly={isRecording || status === "Processing audio..."} // Lock the field if recording or if the backend is processing audio
+            rows={7}
+            readOnly={
+              isRecording || status === "Processing audio..." || isStreamingMode
+            } // Lock the field if recording or if the backend is processing audio
             onChange={(e) => setTranscription(e.target.value)}
             aria-labelledby="transcribed-text-output"
           />

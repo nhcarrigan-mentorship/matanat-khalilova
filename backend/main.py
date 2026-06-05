@@ -20,7 +20,6 @@ from fastapi import (
     File,
     Form,
     HTTPException,
-    Request,
     Response,
     UploadFile,
     WebSocket,
@@ -30,8 +29,12 @@ from fastapi import (
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, EmailStr, field_validator
 
-from audio_utils import process_voice_profile_training, transcribe_audio_bytes
-from auth_utils import create_access_token, verify_access_token
+from audio_utils import (
+    process_voice_profile_training,
+    refine_transcription,
+    transcribe_audio_bytes,
+)
+from auth_utils import create_access_token, get_current_user_auth
 from database import client, db, phrases_collection, users_collection
 
 app = FastAPI()
@@ -184,36 +187,10 @@ async def login(response: Response, user: UserLogin):
 
 
 @app.get("/api/auth/me")
-async def get_current_user(request: Request):
-    token = request.cookies.get("access_token")
-    if not token:
-        raise HTTPException(status_code=401, detail="Not authenticated")
-    # Verify token and get user ID
-    user_id = verify_access_token(token)
-    if not user_id:
-        raise HTTPException(status_code=401, detail="Invalid or expired token")
-    # Look up user in database
-    user = await users_collection.find_one({"_id": ObjectId(user_id)})
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-    # Return the user data (don't send password back)
+async def get_current_user_profile(current_user: dict = Depends(get_current_user_auth)):
     return {
         "status": "success",
-        "user": {
-            "id": str(user["_id"]),
-            "email": user["email"],
-            "name": user["name"],
-            "is_trained": user.get(
-                "is_trained", False
-            ),  # 15/15 sample recorded and validated
-            "is_optimized": user.get("is_optimized", False),  # Whisper patterns mapped
-            "correction_prompt": user.get(
-                "correction_prompt", ""
-            ),  # The generated correction prompt for Whisper
-            "correction_map": user.get(
-                "correction_map", {}
-            ),  # The generated correction map for Whisper
-        },
+        "user": current_user["user"],
     }
 
 
@@ -245,7 +222,7 @@ async def get_phrases():
 async def upload_audio(
     file: UploadFile = File(...),
     phrase_id: str = Form(...),  # Catch the phrase ID from the frontend
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(get_current_user_auth),
 ):
     try:
         actual_user_id = current_user["user"]["id"]
@@ -301,7 +278,7 @@ async def upload_audio(
 
 
 @app.get("/api/my-recordings")
-async def get_user_recordings(current_user: dict = Depends(get_current_user)):
+async def get_user_recordings(current_user: dict = Depends(get_current_user_auth)):
     try:
         # 1. Get the ID of the logged-in user
         actual_user_id = current_user["user"]["id"]
@@ -350,7 +327,7 @@ async def get_user_recordings(current_user: dict = Depends(get_current_user)):
 
 
 @app.post("/api/train-profile")
-async def train_profile(current_user: dict = Depends(get_current_user)):
+async def train_profile(current_user: dict = Depends(get_current_user_auth)):
     try:
         # The logged-in user's ID
         actual_user_id = current_user["user"]["id"]
@@ -392,7 +369,7 @@ async def train_profile(current_user: dict = Depends(get_current_user)):
 
 
 @app.get("/api/voice-profile/status")
-async def get_profile_status(current_user: dict = Depends(get_current_user)):
+async def get_profile_status(current_user: dict = Depends(get_current_user_auth)):
     try:
         actual_user_id = current_user["user"]["id"]
         profile = await users_collection.find_one({"_id": ObjectId(actual_user_id)})
@@ -424,7 +401,7 @@ MAX_REQUESTS_PER_WINDOW = 5
 @app.post("/api/translate/instant")
 async def consecutive_translation(
     audio_file: UploadFile = File(...),
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(get_current_user_auth),
 ):
     actual_user_id = current_user["user"]["id"]
     current_time = time.time()
@@ -472,41 +449,7 @@ async def consecutive_translation(
         # Extract the correction prompt rules from the user's profile
         correction_prompt = user_profile.get("correction_prompt", "")
         # 4. If prompt exists, send (Raw Text + Prompt) to Llama-3.1-8b-instant
-        if correction_prompt and correction_prompt.strip():
-            from audio_utils import groq_client
-
-            user_content = (
-                f"SPEECH PROFILE RULES:\n{correction_prompt}\n\n"
-                f"RAW TRANSCRIPTION:\n{raw_transcription}"
-            )
-
-            llm_response = groq_client.chat.completions.create(
-                model="llama-3.1-8b-instant",
-                messages=[
-                    {
-                        "role": "system",
-                        "content": (
-                            "You are an AI Assistive Speech Refiner. "
-                            "Your job is to correct transcription errors "
-                            "based STRICTLY on the user's custom speech profile rules. "
-                            "Fix stuttering, misheard terminology, "
-                            "or context errors as defined by the rules. "
-                            "Keep the final text natural. Return ONLY the "
-                            "corrected text string and nothing else—no pleasantries, "
-                            "no conversational responses."
-                        ),
-                    },
-                    {
-                        "role": "user",
-                        "content": user_content,
-                    },
-                ],
-                temperature=0.2,  # Low temperature for more deterministic corrections
-            )
-            corrected_text = llm_response.choices[0].message.content.strip()
-        else:
-            # If no correction prompt is set up, just return the raw transcription
-            corrected_text = raw_transcription
+        corrected_text = refine_transcription(raw_transcription, correction_prompt)
         # 5. Return the final corrected text string to the frontend
         return {
             "status": "success",
@@ -526,6 +469,7 @@ async def consecutive_translation(
 vad_iterator = VADIterator(
     VAD_MODEL, sampling_rate=16000, threshold=0.4
 )  # Slightly lower threshold for crisp speech capture
+# threshold is a sensitivity setting for VAD ( how confident it's that it's speech)
 
 
 def convert_raw_pcm_to_wav(pcm_array: np.ndarray) -> bytes:
@@ -538,7 +482,7 @@ def convert_raw_pcm_to_wav(pcm_array: np.ndarray) -> bytes:
     int_samples = int_samples.astype(np.int16)
 
     wav_io = io.BytesIO()
-    with wave.open(wav_io, "wb") as wav_file:
+    with wave.open(wav_io, "wb") as wav_file:  # wb means "write binary"
         wav_file.setnchannels(1)  # Mono
         wav_file.setsampwidth(2)  # 16-bit audio = 2 bytes per sample
         wav_file.setframerate(16000)  # 16kHz
@@ -548,26 +492,33 @@ def convert_raw_pcm_to_wav(pcm_array: np.ndarray) -> bytes:
 
 
 @app.websocket("/api/stream")
-async def websocket_endpoint(websocket: WebSocket):
+async def websocket_endpoint(
+    websocket: WebSocket, current_user: dict = Depends(get_current_user_auth)
+):
     await websocket.accept()
     print("WebSocket Connection established successfully via raw PCM")
 
-    # Pure numeric list to hold our incoming samples linearly
-    master_pcm_stream = []
+    actual_user_id = current_user["user"]["id"]
+    user_profile = await users_collection.find_one({"_id": ObjectId(actual_user_id)})
 
-    # Strictly independent timeline pointers
-    vad_pointer = 0  # Tracks exactly how far the VAD has processed chronologically
-    sentence_start = 0  # Tracks the starting index of our active verbal sentence
-    window_size = 512  # For a 16kHz stream, VAD expects exactly 512 samples at a time
+    correction_prompt = ""
+    if user_profile:
+        correction_prompt = user_profile.get("correction_prompt", "").strip()
+
+    master_pcm_stream = []
+    vad_pointer = 0
+    window_size = 512
+    active_speech_start = None
+
+    # Tracks accumulated silent samples
+    consecutive_silence_samples = 0
 
     try:
         while True:
-            # Catch raw incoming binary array directly from the browser mic
             data = await websocket.receive_bytes()
             if not data:
                 continue
 
-            # Convert raw bytes directly to float32 numbers (No decoding required)
             incoming_samples = np.frombuffer(data, dtype=np.float32)
             master_pcm_stream.extend(incoming_samples)
 
@@ -575,50 +526,99 @@ async def websocket_endpoint(websocket: WebSocket):
             sentence_end = 0
 
             # Step-by-step processing through our linear stream
-            # VAD only processes truly brand-new samples that just arrived
             while vad_pointer + window_size <= len(master_pcm_stream):
                 window = master_pcm_stream[vad_pointer : vad_pointer + window_size]
-                vad_pointer += window_size
 
                 speech_dict = vad_iterator(torch.from_numpy(np.array(window)))
 
-                if speech_dict and "end" in speech_dict:
-                    print(f"[VAD] Clean Human Pause Detected at sample {vad_pointer}")
-                    sentence_detected = True
-                    sentence_end = vad_pointer
-                    break  # Break out to dispatch this audio segment to Groq
+                if speech_dict:
+                    if "start" in speech_dict:
+                        active_speech_start = speech_dict["start"]
+                        print(
+                            f"VAD: Human speech started at sample {active_speech_start}"
+                        )
+
+                    if "end" in speech_dict:
+                        sentence_end = speech_dict["end"]
+                        print(
+                            f"VAD: Clean Human Pause Detected at sample {sentence_end}"
+                        )
+                        sentence_detected = True
+                        vad_pointer += window_size
+                        break
+
+                # Count silence samples if no speech is actively happening
+                if active_speech_start is None:
+                    consecutive_silence_samples += window_size
+                else:
+                    consecutive_silence_samples = 0
+
+                vad_pointer += window_size
 
             if sentence_detected:
-                """
-                Slice strictly from where this sentence began to
-                where the VAD spotted the pause
-                """
-                current_sentence = np.array(
-                    master_pcm_stream[sentence_start:sentence_end], dtype=np.float32
+                # Define a 300ms padding buffer (4800 samples at 16kHz)
+                padding = 4800
+                # If we missed the "start" token,
+                # default safely to the beginning of the clear buffer
+                slice_start = (
+                    active_speech_start if active_speech_start is not None else 0
                 )
-                """
-                Enforce a healthier minimum audio length
-                (~0.5 seconds) to avoid processing background clicks
-                """
+                # Reach BACKWARD into the stream to catch
+                # the initial consonant (like the 'G' in guys)
+                slice_start = max(0, slice_start - padding)
+
+                # Reach FORWARD into the stream to catch trailing
+                # breaths or soft endings (like 'S')
+                # Note: we use vad_pointer here because
+                # sentence_end might cut off the trailing cushion
+                slice_end = min(len(master_pcm_stream), sentence_end + padding)
+
+                # Slice precisely from voice start to voice pause
+                current_sentence = np.array(
+                    master_pcm_stream[slice_start:slice_end], dtype=np.float32
+                )
+
                 if len(current_sentence) > 8000:
                     wav_bytes = convert_raw_pcm_to_wav(current_sentence)
                     print(
                         f"Sending segment ({len(current_sentence)} samples) to Groq..."
                     )
+
                     raw_transcription = await transcribe_audio_bytes(
                         wav_bytes, filename="sentence.wav"
                     )
+                    print(f"[DEBUG LOG] WHISPER RAW: '{raw_transcription}'")
 
-                    if raw_transcription.strip() and raw_transcription.strip() != ".":
-                        print(f"Groq Live Transcription: {raw_transcription}")
-                        await websocket.send_text(f"TRANSCRIPT:{raw_transcription}")
+                    final_output = refine_transcription(
+                        raw_transcription, correction_prompt
+                    )
+                    print(f"[DEBUG LOG] LLM REFINED: '{final_output}'")
 
-                # Set the start marker for next sentence right where this one finished
-                sentence_start = sentence_end
+                    if final_output.strip() and final_output.strip() != ".":
+                        print(f"Live Output Sent: {final_output}")
+                        await websocket.send_text(f"TRANSCRIPT:{final_output}")
+
+                # Clear the entire evaluated window and drop pointers to 0
+                # guarantees next loop iteration is perfectly 1:1 synced with Silero
+                master_pcm_stream = master_pcm_stream[vad_pointer:]
+                vad_pointer = 0
+                active_speech_start = None
+
+                # Reset silence counter right after a sentence finishes processing
+                consecutive_silence_samples = 0
+
                 vad_iterator.reset_states()
                 continue
 
-            await websocket.send_text("STREAMING:processing_audio")
+            # 160,000 samples = 10 continuous seconds of silence
+            # This runs only when no complete sentence was handled in this chunk cycle
+            if consecutive_silence_samples >= 160000:
+                print(
+                    f"[AUTO-STOP] {consecutive_silence_samples} samples of silence. "
+                    f"Winding down..."
+                )
+                await websocket.send_text("SYSTEM:AUTO_STOP")
+                break
 
     except WebSocketDisconnect:
         print("Client disconnected from WebSocket safely")
