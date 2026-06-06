@@ -14,6 +14,7 @@ const MeetingSandbox = () => {
   const [isStreamingMode, setIsStreamingMode] = useState(false);
   const socketRef = useRef(null);
   const textareaRef = useRef(null);
+  const recordingStartTimeRef = useRef(0);
 
   const mediaRecorderRef = useRef(null); // Holds the active MediaRecorder instance
   const audioChunksRef = useRef([]); // Holds the raw binary audio array chunks
@@ -83,6 +84,9 @@ const MeetingSandbox = () => {
       setStatus("Recording...");
       setIsRecording(true);
 
+      // Capture the exact millisecond recording started
+      recordingStartTimeRef.current = Date.now();
+
       let options = { mimeType: "audio/webm;codecs=opus" };
       if (!MediaRecorder.isTypeSupported(options.mimeType)) {
         options = MediaRecorder.isTypeSupported("audio/webm")
@@ -116,6 +120,16 @@ const MeetingSandbox = () => {
 
     // If we aren't actively recording, do nothing
     if (!isRecording || !mediaRecorderRef.current) return;
+
+    // Calculate time passed. If it's under 300ms, ignore this ghost event
+    const timeElapsed = Date.now() - recordingStartTimeRef.current;
+    if (timeElapsed < 300) {
+      // eslint-disable-next-line no-console
+      console.warn(
+        `Ignored rapid stopRecording ghost event. Elapsed: ${timeElapsed}ms`,
+      );
+      return;
+    }
 
     setStatus("Processing audio...");
     setIsRecording(false);
@@ -179,12 +193,54 @@ const MeetingSandbox = () => {
     }
   };
 
+  // Standalone helper to handle all hardware disposal safely and keep the code DRY
+  const cleanupHardwareResources = async () => {
+    // 1. Turn off the microphone hardware tracks
+    if (localStreamRef.current) {
+      localStreamRef.current.getTracks().forEach((track) => track.stop());
+      localStreamRef.current = null;
+    }
+
+    // Fallback check just in case consecutive mode used the mediaRecorder
+    if (mediaRecorderRef.current && mediaRecorderRef.current.stream) {
+      mediaRecorderRef.current.stream
+        .getTracks()
+        .forEach((track) => track.stop());
+      mediaRecorderRef.current = null;
+    }
+
+    // 2. Disconnect and clear the processor node
+    if (processorRef.current) {
+      processorRef.current.disconnect();
+      processorRef.current = null;
+    }
+
+    // 3. Close the AudioContext pipeline safely
+    if (audioContextRef.current) {
+      if (audioContextRef.current.state !== "closed") {
+        await audioContextRef.current.close();
+      }
+      audioContextRef.current = null;
+    }
+  };
+
   const startContinuousStreaming = async () => {
     if (isTransitioning) return;
 
     setTranscription("");
+    setAudioUrl(null);
+
     setIsTransitioning(true); // Lock the button during initialization phase
     setStatus("Connecting to live stream...");
+
+    // Initialize AudioContext synchronously right on user gesture click
+    // to avoid strict browser security suspension policies
+    const audioContext = new (window.AudioContext || window.webkitAudioContext)(
+      {
+        sampleRate: 16000,
+      },
+    );
+    audioContextRef.current = audioContext;
 
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
@@ -195,123 +251,118 @@ const MeetingSandbox = () => {
         },
       });
       localStreamRef.current = stream;
+
       // Create the native browser WebSocket connection
       const ws = new WebSocket("ws://localhost:8000/api/stream");
       socketRef.current = ws;
 
-      ws.onopen = () => {
-        setStatus("Streaming Mode Active");
-        setIsTransitioning(false); // Unlock now - the button is now a safe "Finish" toggle
-        setIsStreamingMode(true);
-        // eslint-disable-next-line no-console
-        console.log(
-          "Frontend connected to WebSocket successfully. Starting PCM audio stream...",
-        );
+      ws.onopen = async () => {
+        // Wrapped in a micro try/catch to intercept async promise failures
+        try {
+          setStatus("Streaming Mode Active");
+          setIsTransitioning(false); // Unlock now - the button is a safe "Finish" toggle
+          setIsStreamingMode(true);
+          // eslint-disable-next-line no-console
+          console.log(
+            "Frontend connected to WebSocket successfully. Starting PCM audio stream...",
+          );
 
-        // Initialize Native AudioContext forced to 16kHz
-        const audioContext = new (
-          window.AudioContext || window.webkitAudioContext
-        )({ sampleRate: 16000 });
-        audioContextRef.current = audioContext;
-
-        const source = audioContext.createMediaStreamSource(stream);
-
-        // Create a script processor to capture raw 32-bit floating point PCM nodes
-        // Buffer size of 4096 samples provides a stable balance of latency and performance
-        const processor = audioContext.createScriptProcessor(4096, 1, 1);
-        processorRef.current = processor;
-
-        source.connect(processor);
-        processor.connect(audioContext.destination);
-
-        // Store the stream on a ref so stopContinuousStreaming can access its tracks
-        mediaRecorderRef.current = { stream };
-
-        processor.onaudioprocess = (e) => {
-          if (ws.readyState === WebSocket.OPEN) {
-            // Grab the raw numeric float32 sound wave channel data
-            const leftChannel = e.inputBuffer.getChannelData(0);
-
-            // Send the pure raw numbers directly down the pipe (No WebM/FFmpeg containers)
-            ws.send(leftChannel.buffer);
+          // Force-resume context to guarantee processing node starts running
+          if (audioContext.state === "suspended") {
+            await audioContext.resume();
           }
-        };
+
+          const source = audioContext.createMediaStreamSource(stream);
+
+          // Create a script processor to capture raw 32-bit floating point PCM nodes
+          const processor = audioContext.createScriptProcessor(4096, 1, 1);
+          processorRef.current = processor;
+
+          source.connect(processor);
+          processor.connect(audioContext.destination);
+
+          // Store the stream on a ref so stopContinuousStreaming can access its tracks
+          mediaRecorderRef.current = { stream };
+
+          processor.onaudioprocess = (e) => {
+            if (ws.readyState === WebSocket.OPEN) {
+              // Grab the raw numeric float32 sound wave channel data
+              const leftChannel = e.inputBuffer.getChannelData(0);
+
+              // Send the pure raw numbers directly down the pipe (No WebM/FFmpeg containers)
+              ws.send(leftChannel);
+            }
+          };
+        } catch (audioGraphError) {
+          // eslint-disable-next-line no-console
+          console.error(
+            "Failed to compile audio processing graph:",
+            audioGraphError,
+          );
+          setStatus("Audio initialization failed.");
+          ws.close(); // Triggers ws.onclose below to clean up resources cleanly
+        }
       };
 
       ws.onmessage = (event) => {
         if (event.data === "SYSTEM:AUTO_STOP") {
           // eslint-disable-next-line no-console
           console.log("Received auto-stop from server due to silence");
-          stopContinuousStreaming(); // This now safely shuts down the mic hardware too
+          stopContinuousStreaming(); // Safely shuts down the mic hardware too
           return;
         }
         console.log("Received message from backend socket:", event.data); // eslint-disable-line no-console
         setTranscription((prev) => prev + "\n" + event.data);
       };
 
-      ws.onerror = (error) => {
+      ws.onerror = async (error) => {
         console.error("WebSocket error observed:", error); // eslint-disable-line no-console
         setStatus("Streaming connection error.");
         setIsTransitioning(false); // Make sure to unlock if the connection fails
         setIsStreamingMode(false); // Protect the UI layout if connection drops abruptly
+        await cleanupHardwareResources();
       };
 
-      ws.onclose = () => {
+      ws.onclose = async () => {
         console.log("WebSocket bridge closed safely."); // eslint-disable-line no-console
+        await cleanupHardwareResources();
         setStatus("Idle");
         setIsTransitioning(false); // Unlock for the next session
         setIsStreamingMode(false);
       };
     } catch (error) {
       setStatus("Error accessing microphone.");
-      console.error("Microphone setup failed:", error); // eslint-disable-line no-console
+      console.error("Streaming setup failed:", error); // eslint-disable-line no-console
+
+      // Use central cleaner to guarantee both the context and
+      // the microphone tracks are completely killed if a mid-setup crash happens
+      await cleanupHardwareResources();
+
       setIsTransitioning(false); // Unlock on error
       setIsStreamingMode(false);
     }
   };
 
   const stopContinuousStreaming = async () => {
-    if (isTransitioning) return;
+    // Guard clause allows breaking a pending connection loop while initialization happens
+    if (!localStreamRef.current && !socketRef.current) return;
 
     setIsTransitioning(true); // Lock the button while winding down hardware
     setStatus("Disconnecting cleanly...");
-    // 1. Turn off the microphone hardware tracks
-    if (localStreamRef.current) {
-      localStreamRef.current.getTracks().forEach((track) => {
-        track.stop();
-        console.log("Mic live stream track stopped safely"); // eslint-disable-line no-console
-      });
-      localStreamRef.current = null;
-    }
 
-    // Fallback fallback just in case consecutive mode used the mediaRecorder
-    if (mediaRecorderRef.current && mediaRecorderRef.current.stream) {
-      mediaRecorderRef.current.stream
-        .getTracks()
-        .forEach((track) => track.stop());
-      mediaRecorderRef.current = null;
-    }
-    // 2. Disconnect and close the AudioContext pipeline safely
-    if (processorRef.current) {
-      processorRef.current.disconnect();
-      processorRef.current = null;
-    }
-    if (audioContextRef.current) {
-      // .close() returns a promise; awaiting it ensures hardware is released before moving on
-      if (audioContextRef.current.state !== "closed") {
-        await audioContextRef.current.close();
-      }
-      audioContextRef.current = null;
-    }
+    // Turn off and clear all audio nodes/hardware tracks
+    await cleanupHardwareResources();
 
-    // 3. Close the WebSocket connection
+    // Close the WebSocket connection
     if (socketRef.current) {
       socketRef.current.close();
       socketRef.current = null;
+    } else {
+      // Fallback UI reset block if no socket is active to trigger the ws.onclose event
+      setStatus("Idle");
+      setIsTransitioning(false);
+      setIsStreamingMode(false);
     }
-    setIsRecording(false); // Turns button from Red back to Green
-    setIsTransitioning(false); // Releases the button click lock
-    setStatus("Idle");
   };
 
   return (
