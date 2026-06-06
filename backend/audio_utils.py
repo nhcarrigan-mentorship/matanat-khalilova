@@ -34,6 +34,7 @@ async def transcribe_audio_bytes(
             file=(filename, audio_bytes),
             model=WHISPER_MODEL,
             temperature=0,  # 0 means deterministic, keeping it highly accurate
+            language="en",
             response_format="verbose_json",
         )
         return transcription.text
@@ -238,11 +239,12 @@ async def process_voice_profile_training(user_id: str) -> dict:
             f"USER SPEECH PROFILE:\n"
             f"- Diagnosis: Dysarthric speech patterns.\n"
             f"- Target Language: 100% English only.\n"
-            f"- Known Whisper Mishearing Dictionary:\n{map_str}\n\n"
-            f"INSTRUCTION: Map any distorted, "
-            f"foreign-looking phonetic words in the raw text "
-            f"to their closest semantic or English "
-            f"equivalent using the dictionary above."
+            f"- Known Whisper Mishearing Dictionary "
+            f"(EXHAUSTIVE LOOKUP ONLY):\n{map_str}\n\n"
+            f"INSTRUCTION: Apply the substitutions from the dictionary above "
+            f"ONLY for the exact words listed. "
+            f"Do NOT infer, generalize, or create new mapping rules for words "
+            f"that are not explicitly present in the dictionary."
         )
 
     return {
@@ -285,12 +287,20 @@ def refine_transcription(raw_transcription: str, correction_prompt: str) -> str:
                     "'X sounds phonetically similar to Y'.\n"
                     "- DO NOT discuss rules, phonetics, grammar, "
                     "or provide explanations.\n"
+                    "- STRICT NO-EXTRAPOLATION RULE: The 'Known Whisper "
+                    "Mishearing Dictionary' is an exhaustive lookup table. "
+                    "Do NOT extract themes, semantic categories, or conceptual "
+                    "patterns from it to apply to unlisted words. For example, "
+                    "even if 'Word X' explicitly maps to 'Word Y' in the dictionary, "
+                    "you must NEVER assume a semantically related word 'Word Z' "
+                    "maps to an alternative unless it is explicitly listed as a key. "
+                    "If a valid English word is not a key "
+                    "in the dictionary, you are strictly forbidden from altering it.\n"
                     "- NEVER swap or substitute valid English nouns for "
-                    "synonyms (e.g., never change 'guys' to 'boys' or "
-                    "'men') just to make a sentence sound more formal or "
-                    "structured. If the raw word is a valid English "
-                    "word, leave it exactly as it is unless a strict "
-                    "rule overrides it.\n"
+                    "synonyms or alternative categories just to make a sentence "
+                    "sound more formal, structured, or standard. If the raw word is a "
+                    "valid English word, leave it exactly as it is unless a strict "
+                    "dictionary key directly overrides it.\n"
                     "- CRITICAL: Whisper will frequently hallucinate "
                     "foreign characters (like tól, Gæst, Bóið) when "
                     "processing dysarthric audio. The user CANNOT "
@@ -298,9 +308,8 @@ def refine_transcription(raw_transcription: str, correction_prompt: str) -> str:
                     "as distorted English words. Translate or match "
                     "them back to standard English or the provided "
                     "dictionary rules. Never output a foreign word.\n"
-                    "- If a sentence is already correct English "
-                    "(e.g., 'I am happy with you guys.'), "
-                    "do not change any nouns.\n\n"
+                    "- If a sentence consists entirely of valid, clear English, "
+                    "don't modify the vocabulary, alter the nouns or adjust syntax.\n\n"
                     "OUTPUT FORMAT: Return ONLY the final corrected "
                     "English text string. Absolutely no other text."
                 ),

@@ -448,7 +448,7 @@ async def consecutive_translation(
 
         # Extract the correction prompt rules from the user's profile
         correction_prompt = user_profile.get("correction_prompt", "")
-        # 4. If prompt exists, send (Raw Text + Prompt) to Llama-3.1-8b-instant
+        # 4. If prompt exists, send (Raw Text + Prompt) to LLM
         corrected_text = refine_transcription(raw_transcription, correction_prompt)
         # 5. Return the final corrected text string to the frontend
         return {
@@ -506,7 +506,7 @@ async def websocket_endpoint(
         correction_prompt = user_profile.get("correction_prompt", "").strip()
 
     master_pcm_stream = []
-    vad_pointer = 0
+    vad_pointer = 0  # tracks how much data we've processed so far
     window_size = 512
     active_speech_start = None
 
@@ -564,7 +564,7 @@ async def websocket_endpoint(
                     active_speech_start if active_speech_start is not None else 0
                 )
                 # Reach BACKWARD into the stream to catch
-                # the initial consonant (like the 'G' in guys)
+                # the initial consonant (like the 'g' in 'guys')
                 slice_start = max(0, slice_start - padding)
 
                 # Reach FORWARD into the stream to catch trailing
@@ -596,7 +596,7 @@ async def websocket_endpoint(
 
                     if final_output.strip() and final_output.strip() != ".":
                         print(f"Live Output Sent: {final_output}")
-                        await websocket.send_text(f"TRANSCRIPT:{final_output}")
+                        await websocket.send_text(f"{final_output}")
 
                 # Clear the entire evaluated window and drop pointers to 0
                 # guarantees next loop iteration is perfectly 1:1 synced with Silero
