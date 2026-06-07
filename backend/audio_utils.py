@@ -4,13 +4,13 @@ import re
 
 import httpx
 from bson import ObjectId
-from groq import Groq
+from groq import AsyncGroq
 
 from database import db
 
 # Initialize the Groq client using your environment variable
 try:
-    groq_client = Groq(api_key=os.environ.get("GROQ_API_KEY"))
+    groq_client = AsyncGroq(api_key=os.environ.get("GROQ_API_KEY"))
 except Exception as e:
     print(f"Failed to initialize Groq Client: {e}")
     groq_client = None
@@ -30,7 +30,7 @@ async def transcribe_audio_bytes(
 
     try:
         # We pass a tuple (filename, bytes) to simulate an actual file upload
-        transcription = groq_client.audio.transcriptions.create(
+        transcription = await groq_client.audio.transcriptions.create(
             file=(filename, audio_bytes),
             model=WHISPER_MODEL,
             temperature=0,  # 0 means deterministic, keeping it highly accurate
@@ -255,8 +255,13 @@ async def process_voice_profile_training(user_id: str) -> dict:
     }
 
 
-def refine_transcription(raw_transcription: str, correction_prompt: str) -> str:
-    """Refines raw text using Llama-3.1-8b based on the user's speech rules profile"""
+async def refine_transcription(
+    raw_transcription: str, correction_prompt: str, history_context: str = ""
+) -> str:
+    """Refines raw text using LLM based on the user's speech rules profile"""
+    if not history_context.strip():
+        history_context = "None (This is a single standalone audio block)"
+
     if not correction_prompt or not raw_transcription.strip():
         return raw_transcription
 
@@ -264,10 +269,13 @@ def refine_transcription(raw_transcription: str, correction_prompt: str) -> str:
 
     user_content = (
         f"SPEECH PROFILE RULES:\n{correction_prompt}\n\n"
-        f"RAW TRANSCRIPTION:\n{raw_transcription}"
+        f"PARAGRAPH CONTEXT SPOKEN SO FAR:\n"
+        f"\"{history_context if history_context else '[Start of conversation]'}\"\n\n"
+        f"RAW TRANSCRIPTION TO CORRECT RIGHT NOW:\n{raw_transcription}\n"
     )
-
-    llm_response = groq_client.chat.completions.create(
+    # Model options: llama-3.1-8b-instant (Recommended for speed/high limits)
+    # llama-3.3-70b-versatile (More powerful, stricter reasoning)
+    llm_response = await groq_client.chat.completions.create(
         model="llama-3.3-70b-versatile",
         messages=[
             {
@@ -277,16 +285,26 @@ def refine_transcription(raw_transcription: str, correction_prompt: str) -> str:
                     "in an automated real-time pipeline.\n\n"
                     "YOUR COGNITIVE PIPELINE:\n"
                     "1. Analyze the USER SPEECH PROFILE dictionary rules.\n"
-                    "2. Read the RAW TRANSCRIPTION.\n"
-                    "3. Clean up stutters, repetitions, and replace "
-                    "misheard phonetic words with the correct English "
-                    "words based on the profile.\n"
-                    "4. Output ONLY the finalized clean English string.\n\n"
+                    "2. Read the PARAGRAPH CONTEXT SPOKEN SO FAR (if any) to "
+                    "understand the ongoing conversation flow "
+                    "and sentence boundaries.\n"
+                    "3. Read the RAW TRANSCRIPTION TO CORRECT RIGHT NOW.\n"
+                    "4. ONLY fix literal verbal stutters (like 'w-w-what') "
+                    "and phonetically misheard words using the dictionary keys. "
+                    "Do NOT 'clean up', optimize, or formalize conversational "
+                    "English syntax, idioms, or colloquial terms.\n"
+                    "5. Output ONLY the finalized clean English correction "
+                    "of the new transcription. "
+                    "Do NOT repeat the historical paragraph context in your output.\n\n"
                     "CRITICAL COMPLIANCE RULES:\n"
-                    "- DO NOT think out loud. Never write things like "
-                    "'X sounds phonetically similar to Y'.\n"
-                    "- DO NOT discuss rules, phonetics, grammar, "
-                    "or provide explanations.\n"
+                    "- THE TOUCH-NOTHING RULE: If a sentence consists entirely "
+                    "of valid English words, you are strictly forbidden from "
+                    "modifying the vocabulary, dropping conversational markers "
+                    "(like 'guys', 'like', 'you know'), or altering the word "
+                    "order under the guise of 'cleaning up'. "
+                    "CRITICAL: The provided dictionary keys ALWAYS override this "
+                    "rule. If a phrase or word matches a dictionary key, you "
+                    "MUST apply the dictionary correction immediately.\n"
                     "- STRICT NO-EXTRAPOLATION RULE: The 'Known Whisper "
                     "Mishearing Dictionary' is an exhaustive lookup table. "
                     "Do NOT extract themes, semantic categories, or conceptual "
@@ -301,17 +319,25 @@ def refine_transcription(raw_transcription: str, correction_prompt: str) -> str:
                     "sound more formal, structured, or standard. If the raw word is a "
                     "valid English word, leave it exactly as it is unless a strict "
                     "dictionary key directly overrides it.\n"
-                    "- CRITICAL: Whisper will frequently hallucinate "
-                    "foreign characters (like tól, Gæst, Bóið) when "
+                    "- AUTOMATIC PUNCTUATION: Ensure the output string begins with "
+                    "a capital letter and ends with an appropriate terminal "
+                    "punctuation mark (like a period or question mark), "
+                    "even if the raw transcription lacks it. "
+                    "This is your ONLY permitted structural modification.\n"
+                    "- CRITICAL DISTORTION HANDLING: Whisper will frequently "
+                    "hallucinate foreign characters (like tól, Gæst, Bóið) when "
                     "processing dysarthric audio. The user CANNOT "
                     "speak these languages. Treat these foreign tokens "
                     "as distorted English words. Translate or match "
                     "them back to standard English or the provided "
                     "dictionary rules. Never output a foreign word.\n"
-                    "- If a sentence consists entirely of valid, clear English, "
-                    "don't modify the vocabulary, alter the nouns or adjust syntax.\n\n"
+                    "- DO NOT think out loud. Never write things like "
+                    "'X sounds phonetically similar to Y'.\n"
+                    "- DO NOT discuss rules, phonetics, grammar, "
+                    "or provide explanations.\n\n"
                     "OUTPUT FORMAT: Return ONLY the final corrected "
-                    "English text string. Absolutely no other text."
+                    "English text string representing the new chunk. "
+                    "Absolutely no other text."
                 ),
             },
             {"role": "user", "content": user_content},

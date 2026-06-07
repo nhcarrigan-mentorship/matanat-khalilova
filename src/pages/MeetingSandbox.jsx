@@ -55,6 +55,28 @@ const MeetingSandbox = () => {
     }
   }, [transcription]); // Fires instantly every time new text lands
 
+  // This effect acts as a garbage collector when the user leaves the page
+  // By passing an empty array [], it triggers only when the component dies
+  // It guarantees the mic light turns off, the WebSocket disconnects safely,
+  // and the browser audio pipeline closes, preventing severe memory leaks
+  useEffect(() => {
+    // Tear down everything when the component dies
+    return () => {
+      if (socketRef.current) {
+        socketRef.current.close();
+      }
+      if (localStreamRef.current) {
+        localStreamRef.current.getTracks().forEach((track) => track.stop());
+      }
+      if (
+        audioContextRef.current &&
+        audioContextRef.current.state !== "closed"
+      ) {
+        audioContextRef.current.close();
+      }
+    };
+  }, []);
+
   // If user data is not yet loaded, show a loading message
   if (!user) {
     return <div>Loading...</div>;
@@ -305,10 +327,16 @@ const MeetingSandbox = () => {
       };
 
       ws.onmessage = (event) => {
-        if (event.data === "SYSTEM:AUTO_STOP") {
+        if (
+          event.data === "SYSTEM:AUTO_STOP" ||
+          event.data === "SYSTEM:FINISHED"
+        ) {
           // eslint-disable-next-line no-console
-          console.log("Received auto-stop from server due to silence");
-          stopContinuousStreaming(); // Safely shuts down the mic hardware too
+          console.log("Stream stop confirmed by server");
+          if (socketRef.current) {
+            socketRef.current.close();
+            socketRef.current = null;
+          }
           return;
         }
         console.log("Received message from backend socket:", event.data); // eslint-disable-line no-console
@@ -354,9 +382,8 @@ const MeetingSandbox = () => {
     await cleanupHardwareResources();
 
     // Close the WebSocket connection
-    if (socketRef.current) {
-      socketRef.current.close();
-      socketRef.current = null;
+    if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
+      socketRef.current.send(new ArrayBuffer(0));
     } else {
       // Fallback UI reset block if no socket is active to trigger the ws.onclose event
       setStatus("Idle");

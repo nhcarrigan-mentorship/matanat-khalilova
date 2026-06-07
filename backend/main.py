@@ -449,7 +449,9 @@ async def consecutive_translation(
         # Extract the correction prompt rules from the user's profile
         correction_prompt = user_profile.get("correction_prompt", "")
         # 4. If prompt exists, send (Raw Text + Prompt) to LLM
-        corrected_text = refine_transcription(raw_transcription, correction_prompt)
+        corrected_text = await refine_transcription(
+            raw_transcription, correction_prompt
+        )
         # 5. Return the final corrected text string to the frontend
         return {
             "status": "success",
@@ -464,12 +466,6 @@ async def consecutive_translation(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error processing audio translation: {str(e)}",
         )
-
-
-vad_iterator = VADIterator(
-    VAD_MODEL, sampling_rate=16000, threshold=0.4
-)  # Slightly lower threshold for crisp speech capture
-# threshold is a sensitivity setting for VAD ( how confident it's that it's speech)
 
 
 def convert_raw_pcm_to_wav(pcm_array: np.ndarray) -> bytes:
@@ -496,7 +492,14 @@ async def websocket_endpoint(
     websocket: WebSocket, current_user: dict = Depends(get_current_user_auth)
 ):
     await websocket.accept()
+    vad_iterator = VADIterator(
+        VAD_MODEL, sampling_rate=16000, threshold=0.4, min_silence_duration_ms=1000
+    )  # Slightly lower threshold for crisp speech capture
+    # threshold is a sensitivity setting for VAD ( how confident it's that it's speech)
     print("WebSocket Connection established successfully via raw PCM")
+
+    # Initialize a local in-memory context storage for this specific stream
+    session_history_segments = []
 
     actual_user_id = current_user["user"]["id"]
     user_profile = await users_collection.find_one({"_id": ObjectId(actual_user_id)})
@@ -516,8 +519,34 @@ async def websocket_endpoint(
     try:
         while True:
             data = await websocket.receive_bytes()
-            if not data:
-                continue
+
+            if len(data) == 0:
+                print("Frontend sent FINISH signal. Flushing leftover audio...")
+                if len(master_pcm_stream) > 8000:  # At least ~0.5s of speech
+                    current_sentence = np.array(master_pcm_stream, dtype=np.float32)
+                    wav_bytes = convert_raw_pcm_to_wav(current_sentence)
+                    raw_transcription = await transcribe_audio_bytes(
+                        wav_bytes, filename=f"flush_{actual_user_id}.wav"
+                    )
+
+                    clean_txt = raw_transcription.strip().lower().strip(".,!?")
+                    banned_words = {"thank you", "thanks for watching", "okay", "ok"}
+
+                    # Run it through the filter and LLM refinement
+                    if not (clean_txt in banned_words and not session_history_segments):
+                        historical_context = " ".join(session_history_segments)
+                        final_output = await refine_transcription(
+                            raw_transcription=raw_transcription,
+                            correction_prompt=correction_prompt,
+                            history_context=historical_context,
+                        )
+                        if final_output.strip() and final_output.strip() != ".":
+                            session_history_segments.append(final_output.strip())
+                            await websocket.send_text(f"{final_output}")
+
+                # Release the client safely
+                await websocket.send_text("SYSTEM:FINISHED")
+                break
 
             incoming_samples = np.frombuffer(data, dtype=np.float32)
             master_pcm_stream.extend(incoming_samples)
@@ -585,17 +614,40 @@ async def websocket_endpoint(
                     )
 
                     raw_transcription = await transcribe_audio_bytes(
-                        wav_bytes, filename="sentence.wav"
+                        wav_bytes, filename=f"sentence_{actual_user_id}.wav"
                     )
                     print(f"[DEBUG LOG] WHISPER RAW: '{raw_transcription}'")
 
-                    final_output = refine_transcription(
-                        raw_transcription, correction_prompt
+                    clean_txt = raw_transcription.strip().lower().strip(".,!?")
+                    banned_words = {
+                        "thank you",
+                        "thanks for watching",
+                        "okay",
+                        "ok",
+                    }
+                    # if there is no prior talk, whisper likely hallucinated
+                    if clean_txt in banned_words and not session_history_segments:
+                        print("Dropped silent hallucination anomaly.")
+                        master_pcm_stream = master_pcm_stream[vad_pointer:]
+                        vad_pointer = 0
+                        active_speech_start = None
+                        consecutive_silence_samples = 0
+                        vad_iterator.reset_states()
+                        continue
+
+                    # Combine history list into a clean string context
+                    historical_context = " ".join(session_history_segments)
+
+                    final_output = await refine_transcription(
+                        raw_transcription=raw_transcription,
+                        correction_prompt=correction_prompt,
+                        history_context=historical_context,
                     )
                     print(f"[DEBUG LOG] LLM REFINED: '{final_output}'")
 
                     if final_output.strip() and final_output.strip() != ".":
                         print(f"Live Output Sent: {final_output}")
+                        session_history_segments.append(final_output.strip())
                         await websocket.send_text(f"{final_output}")
 
                 # Clear the entire evaluated window and drop pointers to 0
