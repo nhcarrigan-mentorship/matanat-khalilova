@@ -2,7 +2,12 @@ import os
 from datetime import datetime, timedelta, timezone
 
 import jwt
+from bson import ObjectId
 from dotenv import load_dotenv
+from fastapi import HTTPException
+from starlette.requests import HTTPConnection
+
+from database import users_collection
 
 load_dotenv()
 
@@ -31,3 +36,29 @@ def verify_access_token(token: str):
         return user_id
     except jwt.PyJWTError:
         return None
+
+
+async def get_current_user_auth(connection: HTTPConnection):
+    token = connection.cookies.get("access_token")
+    if not token:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+
+    user_id = verify_access_token(token)
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+    user = await users_collection.find_one({"_id": ObjectId(user_id)})
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    return {
+        "status": "success",
+        "user": {
+            "id": str(user["_id"]),
+            "email": user["email"],
+            "name": user["name"],
+            "is_trained": user.get("is_trained", False),
+            "is_optimized": user.get("is_optimized", False),
+            "correction_prompt": user.get("correction_prompt", ""),
+            "correction_map": user.get("correction_map", {}),
+        },
+    }

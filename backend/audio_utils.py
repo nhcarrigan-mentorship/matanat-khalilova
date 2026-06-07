@@ -4,13 +4,13 @@ import re
 
 import httpx
 from bson import ObjectId
-from groq import Groq
+from groq import AsyncGroq
 
 from database import db
 
 # Initialize the Groq client using your environment variable
 try:
-    groq_client = Groq(api_key=os.environ.get("GROQ_API_KEY"))
+    groq_client = AsyncGroq(api_key=os.environ.get("GROQ_API_KEY"))
 except Exception as e:
     print(f"Failed to initialize Groq Client: {e}")
     groq_client = None
@@ -30,10 +30,11 @@ async def transcribe_audio_bytes(
 
     try:
         # We pass a tuple (filename, bytes) to simulate an actual file upload
-        transcription = groq_client.audio.transcriptions.create(
+        transcription = await groq_client.audio.transcriptions.create(
             file=(filename, audio_bytes),
             model=WHISPER_MODEL,
             temperature=0,  # 0 means deterministic, keeping it highly accurate
+            language="en",
             response_format="verbose_json",
         )
         return transcription.text
@@ -235,18 +236,15 @@ async def process_voice_profile_training(user_id: str) -> dict:
         )
 
         correction_prompt = (
-            f"You are a speech correction assistant for a user with dysarthric speech. "
-            f"Whisper speech recognition consistently mishears this specific user. "
-            f"Below are known patterns where the left side is what Whisper heard "
-            f"and the right side is what the user actually meant: {map_str}. "
-            f"When given a raw Whisper transcription, use these patterns AND "
-            f"contextual reasoning to rewrite it as natural, grammatically "
-            f"correct English. If a word sounds phonetically similar "
-            f"to a known pattern, apply the correction. "
-            f"IMPORTANT: The user speaks English only. If Whisper outputs foreign "
-            f"language text, it is a hallucination — the user was speaking English. "
-            f"Preserve the user's intended meaning above all else. "
-            f"Return only the corrected text, nothing else."
+            f"USER SPEECH PROFILE:\n"
+            f"- Diagnosis: Dysarthric speech patterns.\n"
+            f"- Target Language: 100% English only.\n"
+            f"- Known Whisper Mishearing Dictionary "
+            f"(EXHAUSTIVE LOOKUP ONLY):\n{map_str}\n\n"
+            f"INSTRUCTION: Apply the substitutions from the dictionary above "
+            f"ONLY for the exact words listed. "
+            f"Do NOT infer, generalize, or create new mapping rules for words "
+            f"that are not explicitly present in the dictionary."
         )
 
     return {
@@ -255,6 +253,98 @@ async def process_voice_profile_training(user_id: str) -> dict:
         "correction_map": master_correction_map,
         "correction_prompt": correction_prompt,
     }
+
+
+async def refine_transcription(
+    raw_transcription: str, correction_prompt: str, history_context: str = ""
+) -> str:
+    """Refines raw text using LLM based on the user's speech rules profile"""
+    if not history_context.strip():
+        history_context = "None (This is a single standalone audio block)"
+
+    if not correction_prompt or not raw_transcription.strip():
+        return raw_transcription
+
+    from audio_utils import groq_client
+
+    user_content = (
+        f"SPEECH PROFILE RULES:\n{correction_prompt}\n\n"
+        f"PARAGRAPH CONTEXT SPOKEN SO FAR:\n"
+        f"\"{history_context if history_context else '[Start of conversation]'}\"\n\n"
+        f"RAW TRANSCRIPTION TO CORRECT RIGHT NOW:\n{raw_transcription}\n"
+    )
+    # Model options: llama-3.1-8b-instant (Recommended for speed/high limits)
+    # llama-3.3-70b-versatile (More powerful, stricter reasoning)
+    llm_response = await groq_client.chat.completions.create(
+        model="llama-3.3-70b-versatile",
+        messages=[
+            {
+                "role": "system",
+                "content": (
+                    "You are an AI Assistive Speech Refiner operating "
+                    "in an automated real-time pipeline.\n\n"
+                    "YOUR COGNITIVE PIPELINE:\n"
+                    "1. Analyze the USER SPEECH PROFILE dictionary rules.\n"
+                    "2. Read the PARAGRAPH CONTEXT SPOKEN SO FAR (if any) to "
+                    "understand the ongoing conversation flow "
+                    "and sentence boundaries.\n"
+                    "3. Read the RAW TRANSCRIPTION TO CORRECT RIGHT NOW.\n"
+                    "4. ONLY fix literal verbal stutters (like 'w-w-what') "
+                    "and phonetically misheard words using the dictionary keys. "
+                    "Do NOT 'clean up', optimize, or formalize conversational "
+                    "English syntax, idioms, or colloquial terms.\n"
+                    "5. Output ONLY the finalized clean English correction "
+                    "of the new transcription. "
+                    "Do NOT repeat the historical paragraph context in your output.\n\n"
+                    "CRITICAL COMPLIANCE RULES:\n"
+                    "- THE TOUCH-NOTHING RULE: If a sentence consists entirely "
+                    "of valid English words, you are strictly forbidden from "
+                    "modifying the vocabulary, dropping conversational markers "
+                    "(like 'guys', 'like', 'you know'), or altering the word "
+                    "order under the guise of 'cleaning up'. "
+                    "CRITICAL: The provided dictionary keys ALWAYS override this "
+                    "rule. If a phrase or word matches a dictionary key, you "
+                    "MUST apply the dictionary correction immediately.\n"
+                    "- STRICT NO-EXTRAPOLATION RULE: The 'Known Whisper "
+                    "Mishearing Dictionary' is an exhaustive lookup table. "
+                    "Do NOT extract themes, semantic categories, or conceptual "
+                    "patterns from it to apply to unlisted words. For example, "
+                    "even if 'Word X' explicitly maps to 'Word Y' in the dictionary, "
+                    "you must NEVER assume a semantically related word 'Word Z' "
+                    "maps to an alternative unless it is explicitly listed as a key. "
+                    "If a valid English word is not a key "
+                    "in the dictionary, you are strictly forbidden from altering it.\n"
+                    "- NEVER swap or substitute valid English nouns for "
+                    "synonyms or alternative categories just to make a sentence "
+                    "sound more formal, structured, or standard. If the raw word is a "
+                    "valid English word, leave it exactly as it is unless a strict "
+                    "dictionary key directly overrides it.\n"
+                    "- AUTOMATIC PUNCTUATION: Ensure the output string begins with "
+                    "a capital letter and ends with an appropriate terminal "
+                    "punctuation mark (like a period or question mark), "
+                    "even if the raw transcription lacks it. "
+                    "This is your ONLY permitted structural modification.\n"
+                    "- CRITICAL DISTORTION HANDLING: Whisper will frequently "
+                    "hallucinate foreign characters (like tól, Gæst, Bóið) when "
+                    "processing dysarthric audio. The user CANNOT "
+                    "speak these languages. Treat these foreign tokens "
+                    "as distorted English words. Translate or match "
+                    "them back to standard English or the provided "
+                    "dictionary rules. Never output a foreign word.\n"
+                    "- DO NOT think out loud. Never write things like "
+                    "'X sounds phonetically similar to Y'.\n"
+                    "- DO NOT discuss rules, phonetics, grammar, "
+                    "or provide explanations.\n\n"
+                    "OUTPUT FORMAT: Return ONLY the final corrected "
+                    "English text string representing the new chunk. "
+                    "Absolutely no other text."
+                ),
+            },
+            {"role": "user", "content": user_content},
+        ],
+        temperature=0.1,
+    )
+    return llm_response.choices[0].message.content.strip()
 
 
 # TODO: Future enhancement — phonetic matching using jellyfish

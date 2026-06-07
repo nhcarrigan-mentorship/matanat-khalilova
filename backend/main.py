@@ -1,12 +1,16 @@
+import io
 import os
 import re
 import time
+import wave
 from collections import defaultdict
 from datetime import datetime
 
 import bcrypt
 import cloudinary
 import cloudinary.uploader
+import numpy as np
+import torch
 from bson import ObjectId
 from dotenv import load_dotenv
 from fastapi import (
@@ -16,16 +20,21 @@ from fastapi import (
     File,
     Form,
     HTTPException,
-    Request,
     Response,
     UploadFile,
+    WebSocket,
+    WebSocketDisconnect,
     status,
 )
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, EmailStr, field_validator
 
-from audio_utils import process_voice_profile_training, transcribe_audio_bytes
-from auth_utils import create_access_token, verify_access_token
+from audio_utils import (
+    process_voice_profile_training,
+    refine_transcription,
+    transcribe_audio_bytes,
+)
+from auth_utils import create_access_token, get_current_user_auth
 from database import client, db, phrases_collection, users_collection
 
 app = FastAPI()
@@ -33,6 +42,17 @@ router = APIRouter()
 
 # Load environment variables from .env file
 load_dotenv()
+
+# Load the local Silero VAD model and utility function
+# (This downloads the model on the first startup, then reads from cache)
+VAD_MODEL, utils = torch.hub.load(
+    repo_or_dir="snakers4/silero-vad",
+    model="silero_vad",
+    force_reload=False,
+    trust_repo=True,
+)
+
+get_speech_timestamps, save_audio, read_audio, VADIterator, collect_chunks = utils
 
 cloudinary.config(
     cloud_name=os.getenv("CLOUDINARY_CLOUD_NAME"),
@@ -167,36 +187,10 @@ async def login(response: Response, user: UserLogin):
 
 
 @app.get("/api/auth/me")
-async def get_current_user(request: Request):
-    token = request.cookies.get("access_token")
-    if not token:
-        raise HTTPException(status_code=401, detail="Not authenticated")
-    # Verify token and get user ID
-    user_id = verify_access_token(token)
-    if not user_id:
-        raise HTTPException(status_code=401, detail="Invalid or expired token")
-    # Look up user in database
-    user = await users_collection.find_one({"_id": ObjectId(user_id)})
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-    # Return the user data (don't send password back)
+async def get_current_user_profile(current_user: dict = Depends(get_current_user_auth)):
     return {
         "status": "success",
-        "user": {
-            "id": str(user["_id"]),
-            "email": user["email"],
-            "name": user["name"],
-            "is_trained": user.get(
-                "is_trained", False
-            ),  # 15/15 sample recorded and validated
-            "is_optimized": user.get("is_optimized", False),  # Whisper patterns mapped
-            "correction_prompt": user.get(
-                "correction_prompt", ""
-            ),  # The generated correction prompt for Whisper
-            "correction_map": user.get(
-                "correction_map", {}
-            ),  # The generated correction map for Whisper
-        },
+        "user": current_user["user"],
     }
 
 
@@ -228,7 +222,7 @@ async def get_phrases():
 async def upload_audio(
     file: UploadFile = File(...),
     phrase_id: str = Form(...),  # Catch the phrase ID from the frontend
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(get_current_user_auth),
 ):
     try:
         actual_user_id = current_user["user"]["id"]
@@ -284,7 +278,7 @@ async def upload_audio(
 
 
 @app.get("/api/my-recordings")
-async def get_user_recordings(current_user: dict = Depends(get_current_user)):
+async def get_user_recordings(current_user: dict = Depends(get_current_user_auth)):
     try:
         # 1. Get the ID of the logged-in user
         actual_user_id = current_user["user"]["id"]
@@ -333,7 +327,7 @@ async def get_user_recordings(current_user: dict = Depends(get_current_user)):
 
 
 @app.post("/api/train-profile")
-async def train_profile(current_user: dict = Depends(get_current_user)):
+async def train_profile(current_user: dict = Depends(get_current_user_auth)):
     try:
         # The logged-in user's ID
         actual_user_id = current_user["user"]["id"]
@@ -375,7 +369,7 @@ async def train_profile(current_user: dict = Depends(get_current_user)):
 
 
 @app.get("/api/voice-profile/status")
-async def get_profile_status(current_user: dict = Depends(get_current_user)):
+async def get_profile_status(current_user: dict = Depends(get_current_user_auth)):
     try:
         actual_user_id = current_user["user"]["id"]
         profile = await users_collection.find_one({"_id": ObjectId(actual_user_id)})
@@ -407,7 +401,7 @@ MAX_REQUESTS_PER_WINDOW = 5
 @app.post("/api/translate/instant")
 async def consecutive_translation(
     audio_file: UploadFile = File(...),
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(get_current_user_auth),
 ):
     actual_user_id = current_user["user"]["id"]
     current_time = time.time()
@@ -443,7 +437,6 @@ async def consecutive_translation(
             audio_bytes, filename=audio_file.filename
         )
         # 3. Query MongoDB for this authenticated user's profile correction_prompt
-        actual_user_id = current_user["user"]["id"]
         user_profile = await users_collection.find_one(
             {"_id": ObjectId(actual_user_id)}
         )
@@ -455,42 +448,10 @@ async def consecutive_translation(
 
         # Extract the correction prompt rules from the user's profile
         correction_prompt = user_profile.get("correction_prompt", "")
-        # 4. If prompt exists, send (Raw Text + Prompt) to Llama-3.1-8b-instant
-        if correction_prompt and correction_prompt.strip():
-            from audio_utils import groq_client
-
-            user_content = (
-                f"SPEECH PROFILE RULES:\n{correction_prompt}\n\n"
-                f"RAW TRANSCRIPTION:\n{raw_transcription}"
-            )
-
-            llm_response = groq_client.chat.completions.create(
-                model="llama-3.1-8b-instant",
-                messages=[
-                    {
-                        "role": "system",
-                        "content": (
-                            "You are an AI Assistive Speech Refiner. "
-                            "Your job is to correct transcription errors "
-                            "based STRICTLY on the user's custom speech profile rules. "
-                            "Fix stuttering, misheard terminology, "
-                            "or context errors as defined by the rules. "
-                            "Keep the final text natural. Return ONLY the "
-                            "corrected text string and nothing else—no pleasantries, "
-                            "no conversational responses."
-                        ),
-                    },
-                    {
-                        "role": "user",
-                        "content": user_content,
-                    },
-                ],
-                temperature=0.2,  # Low temperature for more deterministic corrections
-            )
-            corrected_text = llm_response.choices[0].message.content.strip()
-        else:
-            # If no correction prompt is set up, just return the raw transcription
-            corrected_text = raw_transcription
+        # 4. If prompt exists, send (Raw Text + Prompt) to LLM
+        corrected_text = await refine_transcription(
+            raw_transcription, correction_prompt
+        )
         # 5. Return the final corrected text string to the frontend
         return {
             "status": "success",
@@ -505,3 +466,220 @@ async def consecutive_translation(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error processing audio translation: {str(e)}",
         )
+
+
+def convert_raw_pcm_to_wav(pcm_array: np.ndarray) -> bytes:
+    """Converts raw float32 PCM data directly into pristine WAV bytes for Groq"""
+    # Force conversion to a true NumPy array immediately to guarantee .tobytes() exists
+    pcm_array = np.asarray(pcm_array, dtype=np.float32)
+
+    # Denormalize floats back to 16-bit integers (-32768 to 32767)
+    int_samples = np.clip(pcm_array, -1.0, 1.0) * 32767.0
+    int_samples = int_samples.astype(np.int16)
+
+    wav_io = io.BytesIO()
+    with wave.open(wav_io, "wb") as wav_file:  # wb means "write binary"
+        wav_file.setnchannels(1)  # Mono
+        wav_file.setsampwidth(2)  # 16-bit audio = 2 bytes per sample
+        wav_file.setframerate(16000)  # 16kHz
+        wav_file.writeframes(int_samples.tobytes())
+
+    return wav_io.getvalue()
+
+
+@app.websocket("/api/stream")
+async def websocket_endpoint(
+    websocket: WebSocket, current_user: dict = Depends(get_current_user_auth)
+):
+    await websocket.accept()
+    vad_iterator = VADIterator(
+        VAD_MODEL, sampling_rate=16000, threshold=0.4, min_silence_duration_ms=1000
+    )  # Slightly lower threshold for crisp speech capture
+    # threshold is a sensitivity setting for VAD ( how confident it's that it's speech)
+    print("WebSocket Connection established successfully via raw PCM")
+
+    # Initialize a local in-memory context storage for this specific stream
+    session_history_segments = []
+
+    actual_user_id = current_user["user"]["id"]
+    user_profile = await users_collection.find_one({"_id": ObjectId(actual_user_id)})
+
+    correction_prompt = ""
+    if user_profile:
+        correction_prompt = user_profile.get("correction_prompt", "").strip()
+
+    master_pcm_stream = []
+    vad_pointer = 0  # tracks how much data we've processed so far
+    window_size = 512
+    active_speech_start = None
+
+    # Tracks accumulated silent samples
+    consecutive_silence_samples = 0
+
+    try:
+        while True:
+            data = await websocket.receive_bytes()
+
+            if len(data) == 0:
+                print("Frontend sent FINISH signal. Flushing leftover audio...")
+                if len(master_pcm_stream) > 8000:  # At least ~0.5s of speech
+                    current_sentence = np.array(master_pcm_stream, dtype=np.float32)
+                    wav_bytes = convert_raw_pcm_to_wav(current_sentence)
+                    raw_transcription = await transcribe_audio_bytes(
+                        wav_bytes, filename=f"flush_{actual_user_id}.wav"
+                    )
+
+                    print(f"[DEBUG LOG] FLUSH RAW WHISPER: '{raw_transcription}'")
+
+                    clean_txt = raw_transcription.strip().lower().strip(".,!?")
+                    banned_words = {"thank you", "thanks for watching", "okay", "ok"}
+
+                    # Run it through the filter and LLM refinement
+                    if clean_txt not in banned_words:
+                        historical_context = " ".join(session_history_segments)
+                        final_output = await refine_transcription(
+                            raw_transcription=raw_transcription,
+                            correction_prompt=correction_prompt,
+                            history_context=historical_context,
+                        )
+                        if final_output.strip() and final_output.strip() != ".":
+                            print(f"[DEBUG LOG] FLUSH LLM REFINED: '{final_output}'")
+                            session_history_segments.append(final_output.strip())
+                            await websocket.send_text(f"{final_output}")
+                    else:
+                        # Know when a hallucination was successfully blocked
+                        print(f"Dropped flush hallucination: '{raw_transcription}'")
+
+                # Release the client safely
+                await websocket.send_text("SYSTEM:FINISHED")
+                break
+
+            incoming_samples = np.frombuffer(data, dtype=np.float32)
+            master_pcm_stream.extend(incoming_samples)
+
+            sentence_detected = False
+            sentence_end = 0
+
+            # Step-by-step processing through our linear stream
+            while vad_pointer + window_size <= len(master_pcm_stream):
+                window = master_pcm_stream[vad_pointer : vad_pointer + window_size]
+
+                speech_dict = vad_iterator(torch.from_numpy(np.array(window)))
+
+                if speech_dict:
+                    if "start" in speech_dict:
+                        active_speech_start = speech_dict["start"]
+                        print(
+                            f"VAD: Human speech started at sample {active_speech_start}"
+                        )
+
+                    if "end" in speech_dict:
+                        sentence_end = speech_dict["end"]
+                        print(
+                            f"VAD: Clean Human Pause Detected at sample {sentence_end}"
+                        )
+                        sentence_detected = True
+                        vad_pointer += window_size
+                        break
+
+                # Count silence samples if no speech is actively happening
+                if active_speech_start is None:
+                    consecutive_silence_samples += window_size
+                else:
+                    consecutive_silence_samples = 0
+
+                vad_pointer += window_size
+
+            if sentence_detected:
+                # Define a 300ms padding buffer (4800 samples at 16kHz)
+                padding = 4800
+                # If we missed the "start" token,
+                # default safely to the beginning of the clear buffer
+                slice_start = (
+                    active_speech_start if active_speech_start is not None else 0
+                )
+                # Reach BACKWARD into the stream to catch
+                # the initial consonant (like the 'g' in 'guys')
+                slice_start = max(0, slice_start - padding)
+
+                # Reach FORWARD into the stream to catch trailing
+                # breaths or soft endings (like 'S')
+                # Note: we use vad_pointer here because
+                # sentence_end might cut off the trailing cushion
+                slice_end = min(len(master_pcm_stream), sentence_end + padding)
+
+                # Slice precisely from voice start to voice pause
+                current_sentence = np.array(
+                    master_pcm_stream[slice_start:slice_end], dtype=np.float32
+                )
+
+                if len(current_sentence) > 8000:
+                    wav_bytes = convert_raw_pcm_to_wav(current_sentence)
+                    print(
+                        f"Sending segment ({len(current_sentence)} samples) to Groq..."
+                    )
+
+                    raw_transcription = await transcribe_audio_bytes(
+                        wav_bytes, filename=f"sentence_{actual_user_id}.wav"
+                    )
+                    print(f"[DEBUG LOG] WHISPER RAW: '{raw_transcription}'")
+
+                    clean_txt = raw_transcription.strip().lower().strip(".,!?")
+                    banned_words = {
+                        "thank you",
+                        "thanks for watching",
+                        "okay",
+                        "ok",
+                    }
+                    # if there is no prior talk, whisper likely hallucinated
+                    if clean_txt in banned_words and not session_history_segments:
+                        print("Dropped silent hallucination anomaly.")
+                        master_pcm_stream = master_pcm_stream[vad_pointer:]
+                        vad_pointer = 0
+                        active_speech_start = None
+                        vad_iterator.reset_states()
+                        continue
+
+                    # Combine history list into a clean string context
+                    historical_context = " ".join(session_history_segments)
+
+                    final_output = await refine_transcription(
+                        raw_transcription=raw_transcription,
+                        correction_prompt=correction_prompt,
+                        history_context=historical_context,
+                    )
+                    print(f"[DEBUG LOG] LLM REFINED: '{final_output}'")
+
+                    if final_output.strip() and final_output.strip() != ".":
+                        print(f"Live Output Sent: {final_output}")
+                        session_history_segments.append(final_output.strip())
+                        await websocket.send_text(f"{final_output}")
+
+                # Clear the entire evaluated window and drop pointers to 0
+                # guarantees next loop iteration is perfectly 1:1 synced with Silero
+                master_pcm_stream = master_pcm_stream[vad_pointer:]
+                vad_pointer = 0
+                active_speech_start = None
+
+                # Reset silence counter right after a sentence finishes processing
+                consecutive_silence_samples = 0
+
+                vad_iterator.reset_states()
+                continue
+
+            # 160,000 samples = 10 continuous seconds of silence
+            # This runs only when no complete sentence was handled in this chunk cycle
+            if consecutive_silence_samples >= 160000:
+                print(
+                    f"[AUTO-STOP] {consecutive_silence_samples} samples of silence. "
+                    f"Winding down..."
+                )
+                await websocket.send_text("SYSTEM:AUTO_STOP")
+                break
+
+    except WebSocketDisconnect:
+        print("Client disconnected from WebSocket safely")
+    except Exception as e:
+        print(f"Unexpected WebSocket error occurred: {str(e)}")
+    finally:
+        vad_iterator.reset_states()
