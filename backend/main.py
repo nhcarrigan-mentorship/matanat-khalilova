@@ -529,11 +529,13 @@ async def websocket_endpoint(
                         wav_bytes, filename=f"flush_{actual_user_id}.wav"
                     )
 
+                    print(f"[DEBUG LOG] FLUSH RAW WHISPER: '{raw_transcription}'")
+
                     clean_txt = raw_transcription.strip().lower().strip(".,!?")
                     banned_words = {"thank you", "thanks for watching", "okay", "ok"}
 
                     # Run it through the filter and LLM refinement
-                    if not (clean_txt in banned_words and not session_history_segments):
+                    if clean_txt not in banned_words:
                         historical_context = " ".join(session_history_segments)
                         final_output = await refine_transcription(
                             raw_transcription=raw_transcription,
@@ -541,8 +543,12 @@ async def websocket_endpoint(
                             history_context=historical_context,
                         )
                         if final_output.strip() and final_output.strip() != ".":
+                            print(f"[DEBUG LOG] FLUSH LLM REFINED: '{final_output}'")
                             session_history_segments.append(final_output.strip())
                             await websocket.send_text(f"{final_output}")
+                    else:
+                        # Know when a hallucination was successfully blocked
+                        print(f"Dropped flush hallucination: '{raw_transcription}'")
 
                 # Release the client safely
                 await websocket.send_text("SYSTEM:FINISHED")
@@ -631,7 +637,6 @@ async def websocket_endpoint(
                         master_pcm_stream = master_pcm_stream[vad_pointer:]
                         vad_pointer = 0
                         active_speech_start = None
-                        consecutive_silence_samples = 0
                         vad_iterator.reset_states()
                         continue
 
