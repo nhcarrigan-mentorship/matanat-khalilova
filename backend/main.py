@@ -446,12 +446,9 @@ async def consecutive_translation(
                 status_code=status.HTTP_404_NOT_FOUND, detail="User profile not found"
             )
 
-        # Extract the correction prompt rules from the user's profile
-        correction_prompt = user_profile.get("correction_prompt", "")
-        # 4. If prompt exists, send (Raw Text + Prompt) to LLM
-        corrected_text = await refine_transcription(
-            raw_transcription, correction_prompt
-        )
+        # Extract the correction map rules from the user's profile
+        correction_map = user_profile.get("correction_map", {})
+        corrected_text = await refine_transcription(raw_transcription, correction_map)
         # 5. Return the final corrected text string to the frontend
         return {
             "status": "success",
@@ -504,9 +501,9 @@ async def websocket_endpoint(
     actual_user_id = current_user["user"]["id"]
     user_profile = await users_collection.find_one({"_id": ObjectId(actual_user_id)})
 
-    correction_prompt = ""
+    correction_map = {}
     if user_profile:
-        correction_prompt = user_profile.get("correction_prompt", "").strip()
+        correction_map = user_profile.get("correction_map", {})
 
     master_pcm_stream = []
     vad_pointer = 0  # tracks how much data we've processed so far
@@ -536,10 +533,10 @@ async def websocket_endpoint(
 
                     # Run it through the filter and LLM refinement
                     if clean_txt not in banned_words:
-                        historical_context = " ".join(session_history_segments)
+                        historical_context = " ".join(session_history_segments[-2:])
                         final_output = await refine_transcription(
                             raw_transcription=raw_transcription,
-                            correction_prompt=correction_prompt,
+                            correction_map=correction_map,
                             history_context=historical_context,
                         )
                         if final_output.strip() and final_output.strip() != ".":
@@ -641,11 +638,11 @@ async def websocket_endpoint(
                         continue
 
                     # Combine history list into a clean string context
-                    historical_context = " ".join(session_history_segments)
+                    historical_context = " ".join(session_history_segments[-2:])
 
                     final_output = await refine_transcription(
                         raw_transcription=raw_transcription,
-                        correction_prompt=correction_prompt,
+                        correction_map=correction_map,
                         history_context=historical_context,
                     )
                     print(f"[DEBUG LOG] LLM REFINED: '{final_output}'")
