@@ -529,7 +529,13 @@ async def websocket_endpoint(
                     print(f"[DEBUG LOG] FLUSH RAW WHISPER: '{raw_transcription}'")
 
                     clean_txt = raw_transcription.strip().lower().strip(".,!?")
-                    banned_words = {"thank you", "thanks for watching", "okay", "ok"}
+                    banned_words = {
+                        "thank you",
+                        "thanks for watching",
+                        "okay",
+                        "ok",
+                        "bye",
+                    }
 
                     # Run it through the filter and LLM refinement
                     if clean_txt not in banned_words:
@@ -627,6 +633,7 @@ async def websocket_endpoint(
                         "thanks for watching",
                         "okay",
                         "ok",
+                        "bye",
                     }
                     # if there is no prior talk, whisper likely hallucinated
                     if clean_txt in banned_words and not session_history_segments:

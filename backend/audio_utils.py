@@ -289,18 +289,19 @@ async def refine_transcription(
     Pipeline Step 1: Normalize digit variations (e.g., '2' -> 'two')
     Pipeline Step 2: Modifies raw input string using local Python dictionary regex
     Pipeline Step 3: Formats capitalization and punctuation via Llama-3.1-8b
+    Pipeline Step 4: Guardrail validates that vocabulary matches 100%
     """
     if not raw_transcription.strip():
         return raw_transcription
 
-    if not correction_map:
-        return raw_transcription
-
     normalized_text = normalize_numerics(raw_transcription)
+    if correction_map:
+        substituted_text = apply_deterministic_substitutions(
+            normalized_text, correction_map
+        )
+    else:
+        substituted_text = normalized_text
 
-    substituted_text = apply_deterministic_substitutions(
-        normalized_text, correction_map
-    )
     print(f"[DEBUG LOG] POST-PYTHON SUB: '{substituted_text}'")
 
     if not groq_client:
@@ -308,24 +309,29 @@ async def refine_transcription(
 
     system_message = (
         "You are a strict syntax and formatting assistant. "
-        "Your ONLY job is to apply proper capitalization and punctuation "
-        "to the text provided inside the <text_to_format> tags.\n\n"
+        "Your ONLY job is to apply proper capitalization and "
+        "punctuation to the text provided inside the <text_to_format> tags.\n\n"
         "YOUR LAWS:\n"
-        "1. Insert proper syntax punctuation (periods, commas, "
-        "question marks, apostrophes).\n"
+        "1. Insert proper syntax punctuation (periods, "
+        "commas, question marks, apostrophes).\n"
         "2. Adjust basic word capitalization contextually "
         "(start of sentences, proper nouns).\n"
-        "3. CRITICAL: Use the <conversation_history> tag (if any) "
-        "ONLY as a guide to understand sentence flow. "
-        "NEVER repeat, copy, or append any sentences from "
-        "the history tag into your final output.\n"
-        "4. UNTOUCHABLE RULE: Do NOT change, add, swap, or delete "
-        "any words from the target text. The vocabulary must remain "
-        "100% identical to what is inside <text_to_format>.\n"
-        "5. OUTPUT RESTRICTION: Return ONLY the final processed "
-        "text string belonging to <text_to_format>. "
-        "Absolutely zero conversational explanations, and "
-        "do not repeat the XML tags themselves."
+        "3. CRITICAL HISTORY RULE: The text inside <conversation_history> "
+        "(if any) is ONLY for context to help you understand sentence flow "
+        "(e.g., if the target text starts mid-sentence). NEVER include, "
+        "repeat, copy, prefix, or append any words or sentences from "
+        "<conversation_history> into your final output. Your output must "
+        "contain ONLY the formatted version of the words "
+        "found inside <text_to_format>.\n"
+        "4. CRITICAL UNTOUCHABLE RULE: Do NOT change, add, swap, "
+        "correct, or delete any words from <text_to_format>. Even if "
+        "a phrase sounds completely unnatural, repetitive, grammatically "
+        "incorrect, or nonsensical (such as repeating 'each and each'), "
+        "you MUST leave the vocabulary 100% identical to the input. "
+        "Never 'fix' expressions, typos, or idioms.\n"
+        "5. OUTPUT RESTRICTION: Return ONLY the final processed text "
+        "string belonging to <text_to_format>. Absolutely zero conversational "
+        "explanations, and do not repeat or include the XML tags themselves."
     )
 
     user_content = (
@@ -342,7 +348,22 @@ async def refine_transcription(
             ],
             temperature=0.0,  # Strict determinism
         )
-        return llm_response.choices[0].message.content.strip()
+        llm_text = llm_response.choices[0].message.content.strip()
+        print(f"[DEBUG LOG] LLM refined: '{llm_text}'")
+
+        words_expected = re.sub(r"[^\w\s]", "", substituted_text.lower()).split()
+        words_received = re.sub(r"[^\w\s]", "", llm_text.lower()).split()
+
+        # If the word sequences match perfectly, return the LLM text
+        if words_expected == words_received:
+            return llm_text
+
+        # If the LLM altered any words, catch it, drop it and fallback safely
+        print("\n[GUARDRAIL] LLM altered target vocabulary")
+        print(f"Expected: {words_expected}")
+        print(f"Received: {words_received}\n")
+        return substituted_text
+
     except Exception as e:
         print(f"Groq LLM formatting pipeline exception: {e}")
         return substituted_text
