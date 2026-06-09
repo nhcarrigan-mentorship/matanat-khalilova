@@ -16,6 +16,7 @@ except Exception as e:
     groq_client = None
 
 WHISPER_MODEL = "whisper-large-v3-turbo"
+FORMATTING_MODEL = "llama-3.1-8b-instant"
 
 
 async def transcribe_audio_bytes(
@@ -73,9 +74,13 @@ def normalize_numerics(text: str) -> str:
         "33": "thirty three",
     }
 
-    words = text.split()
-    normalized_words = [num_map.get(word, word) for word in words]
-    return " ".join(normalized_words)
+    text_modified = text
+    # loop through the map and replace digits using word boundaries (\b)
+    for num_str, word_str in num_map.items():
+        pattern = re.compile(r"\b" + re.escape(num_str) + r"\b")
+        text_modified = pattern.sub(word_str, text_modified)
+
+    return text_modified
 
 
 def build_advanced_map(
@@ -236,15 +241,7 @@ async def process_voice_profile_training(user_id: str) -> dict:
         )
 
         correction_prompt = (
-            f"USER SPEECH PROFILE:\n"
-            f"- Diagnosis: Dysarthric speech patterns.\n"
-            f"- Target Language: 100% English only.\n"
-            f"- Known Whisper Mishearing Dictionary "
-            f"(EXHAUSTIVE LOOKUP ONLY):\n{map_str}\n\n"
-            f"INSTRUCTION: Apply the substitutions from the dictionary above "
-            f"ONLY for the exact words listed. "
-            f"Do NOT infer, generalize, or create new mapping rules for words "
-            f"that are not explicitly present in the dictionary."
+            f"USER SPEECH PROFILE:\n- Known Whisper Mishearing Dictionary:\n{map_str}"
         )
 
     return {
@@ -255,96 +252,121 @@ async def process_voice_profile_training(user_id: str) -> dict:
     }
 
 
-async def refine_transcription(
-    raw_transcription: str, correction_prompt: str, history_context: str = ""
-) -> str:
-    """Refines raw text using LLM based on the user's speech rules profile"""
-    if not history_context.strip():
-        history_context = "None (This is a single standalone audio block)"
+def apply_deterministic_substitutions(raw_text: str, correction_map: dict) -> str:
+    """
+    Executes precise word/phrase mappings locally via Python regex patterns.
+    Preserves structural casing (Capitalized, UPPERCASE, lowercase) dynamically.
+    """
+    if not correction_map or not raw_text.strip():
+        return raw_text
 
-    if not correction_prompt or not raw_transcription.strip():
+    refined_text = raw_text
+    # Sort keys by length descending to process longer phrases before individual words
+    sorted_keys = sorted(correction_map.keys(), key=len, reverse=True)
+    for word in sorted_keys:
+        replacement = correction_map[word]
+        # Using word boundaries (\b) ensures
+        # we match distinct words/phrases instead of word parts
+        pattern = re.compile(r"\b" + re.escape(word) + r"\b", re.IGNORECASE)
+
+        def match_case(match):
+            matched_text = match.group(0)
+            if matched_text.isupper():
+                return replacement.upper()
+            if matched_text and matched_text[0].isupper():
+                return replacement.capitalize()
+            return replacement.lower()
+
+        refined_text = pattern.sub(match_case, refined_text)
+
+    return refined_text
+
+
+async def refine_transcription(
+    raw_transcription: str, correction_map: dict, history_context: str = ""
+) -> str:
+    """
+    Pipeline Step 1: Normalize digit variations (e.g., '2' -> 'two')
+    Pipeline Step 2: Modifies raw input string using local Python dictionary regex
+    Pipeline Step 3: Formats capitalization and punctuation via Llama-3.1-8b
+    Pipeline Step 4: Guardrail validates that vocabulary matches 100%
+    """
+    if not raw_transcription.strip():
         return raw_transcription
 
-    from audio_utils import groq_client
+    normalized_text = normalize_numerics(raw_transcription)
+    if correction_map:
+        substituted_text = apply_deterministic_substitutions(
+            normalized_text, correction_map
+        )
+    else:
+        substituted_text = normalized_text
+
+    print(f"[DEBUG LOG] POST-PYTHON SUB: '{substituted_text}'")
+
+    if not groq_client:
+        return substituted_text
+
+    system_message = (
+        "You are a strict syntax and formatting assistant. "
+        "Your ONLY job is to apply proper capitalization and "
+        "punctuation to the text provided inside the <text_to_format> tags.\n\n"
+        "YOUR LAWS:\n"
+        "1. Insert proper syntax punctuation (periods, "
+        "commas, question marks, apostrophes).\n"
+        "2. Adjust basic word capitalization contextually "
+        "(start of sentences, proper nouns).\n"
+        "3. CRITICAL HISTORY RULE: The text inside <conversation_history> "
+        "(if any) is ONLY for context to help you understand sentence flow "
+        "(e.g., if the target text starts mid-sentence). NEVER include, "
+        "repeat, copy, prefix, or append any words or sentences from "
+        "<conversation_history> into your final output. Your output must "
+        "contain ONLY the formatted version of the words "
+        "found inside <text_to_format>.\n"
+        "4. CRITICAL UNTOUCHABLE RULE: Do NOT change, add, swap, "
+        "correct, or delete any words from <text_to_format>. Even if "
+        "a phrase sounds completely unnatural, repetitive, grammatically "
+        "incorrect, or nonsensical (such as repeating 'each and each'), "
+        "you MUST leave the vocabulary 100% identical to the input. "
+        "Never 'fix' expressions, typos, or idioms.\n"
+        "5. OUTPUT RESTRICTION: Return ONLY the final processed text "
+        "string belonging to <text_to_format>. Absolutely zero conversational "
+        "explanations, and do not repeat or include the XML tags themselves."
+    )
 
     user_content = (
-        f"SPEECH PROFILE RULES:\n{correction_prompt}\n\n"
-        f"PARAGRAPH CONTEXT SPOKEN SO FAR:\n"
-        f"\"{history_context if history_context else '[Start of conversation]'}\"\n\n"
-        f"RAW TRANSCRIPTION TO CORRECT RIGHT NOW:\n{raw_transcription}\n"
+        f"<conversation_history>{history_context}</conversation_history>\n"
+        f"<text_to_format>{substituted_text}</text_to_format>"
     )
-    # Model options: llama-3.1-8b-instant (Recommended for speed/high limits)
-    # llama-3.3-70b-versatile (More powerful, stricter reasoning)
-    llm_response = await groq_client.chat.completions.create(
-        model="llama-3.3-70b-versatile",
-        messages=[
-            {
-                "role": "system",
-                "content": (
-                    "You are an AI Assistive Speech Refiner operating "
-                    "in an automated real-time pipeline.\n\n"
-                    "YOUR COGNITIVE PIPELINE:\n"
-                    "1. Analyze the USER SPEECH PROFILE dictionary rules.\n"
-                    "2. Read the PARAGRAPH CONTEXT SPOKEN SO FAR (if any) to "
-                    "understand the ongoing conversation flow "
-                    "and sentence boundaries.\n"
-                    "3. Read the RAW TRANSCRIPTION TO CORRECT RIGHT NOW.\n"
-                    "4. ONLY fix literal verbal stutters (like 'w-w-what') "
-                    "and phonetically misheard words using the dictionary keys. "
-                    "Do NOT 'clean up', optimize, or formalize conversational "
-                    "English syntax, idioms, or colloquial terms.\n"
-                    "5. Output ONLY the finalized clean English correction "
-                    "of the new transcription. "
-                    "Do NOT repeat the historical paragraph context in your output.\n\n"
-                    "CRITICAL COMPLIANCE RULES:\n"
-                    "- THE TOUCH-NOTHING RULE: If a sentence consists entirely "
-                    "of valid English words, you are strictly forbidden from "
-                    "modifying the vocabulary, dropping conversational markers "
-                    "(like 'guys', 'like', 'you know'), or altering the word "
-                    "order under the guise of 'cleaning up'. "
-                    "CRITICAL: The provided dictionary keys ALWAYS override this "
-                    "rule. If a phrase or word matches a dictionary key, you "
-                    "MUST apply the dictionary correction immediately.\n"
-                    "- STRICT NO-EXTRAPOLATION RULE: The 'Known Whisper "
-                    "Mishearing Dictionary' is an exhaustive lookup table. "
-                    "Do NOT extract themes, semantic categories, or conceptual "
-                    "patterns from it to apply to unlisted words. For example, "
-                    "even if 'Word X' explicitly maps to 'Word Y' in the dictionary, "
-                    "you must NEVER assume a semantically related word 'Word Z' "
-                    "maps to an alternative unless it is explicitly listed as a key. "
-                    "If a valid English word is not a key "
-                    "in the dictionary, you are strictly forbidden from altering it.\n"
-                    "- NEVER swap or substitute valid English nouns for "
-                    "synonyms or alternative categories just to make a sentence "
-                    "sound more formal, structured, or standard. If the raw word is a "
-                    "valid English word, leave it exactly as it is unless a strict "
-                    "dictionary key directly overrides it.\n"
-                    "- AUTOMATIC PUNCTUATION: Ensure the output string begins with "
-                    "a capital letter and ends with an appropriate terminal "
-                    "punctuation mark (like a period or question mark), "
-                    "even if the raw transcription lacks it. "
-                    "This is your ONLY permitted structural modification.\n"
-                    "- CRITICAL DISTORTION HANDLING: Whisper will frequently "
-                    "hallucinate foreign characters (like tól, Gæst, Bóið) when "
-                    "processing dysarthric audio. The user CANNOT "
-                    "speak these languages. Treat these foreign tokens "
-                    "as distorted English words. Translate or match "
-                    "them back to standard English or the provided "
-                    "dictionary rules. Never output a foreign word.\n"
-                    "- DO NOT think out loud. Never write things like "
-                    "'X sounds phonetically similar to Y'.\n"
-                    "- DO NOT discuss rules, phonetics, grammar, "
-                    "or provide explanations.\n\n"
-                    "OUTPUT FORMAT: Return ONLY the final corrected "
-                    "English text string representing the new chunk. "
-                    "Absolutely no other text."
-                ),
-            },
-            {"role": "user", "content": user_content},
-        ],
-        temperature=0.1,
-    )
-    return llm_response.choices[0].message.content.strip()
+
+    try:
+        llm_response = await groq_client.chat.completions.create(
+            model=FORMATTING_MODEL,
+            messages=[
+                {"role": "system", "content": system_message},
+                {"role": "user", "content": user_content},
+            ],
+            temperature=0.0,  # Strict determinism
+        )
+        llm_text = llm_response.choices[0].message.content.strip()
+        print(f"[DEBUG LOG] LLM refined: '{llm_text}'")
+
+        words_expected = re.sub(r"[^\w\s]", "", substituted_text.lower()).split()
+        words_received = re.sub(r"[^\w\s]", "", llm_text.lower()).split()
+
+        # If the word sequences match perfectly, return the LLM text
+        if words_expected == words_received:
+            return llm_text
+
+        # If the LLM altered any words, catch it, drop it and fallback safely
+        print("\n[GUARDRAIL] LLM altered target vocabulary")
+        print(f"Expected: {words_expected}")
+        print(f"Received: {words_received}\n")
+        return substituted_text
+
+    except Exception as e:
+        print(f"Groq LLM formatting pipeline exception: {e}")
+        return substituted_text
 
 
 # TODO: Future enhancement — phonetic matching using jellyfish
