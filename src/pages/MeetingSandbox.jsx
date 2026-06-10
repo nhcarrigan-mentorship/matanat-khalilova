@@ -12,6 +12,7 @@ const MeetingSandbox = () => {
   const navigate = useNavigate();
   const [user, setUser] = useState(null);
   const [isStreamingMode, setIsStreamingMode] = useState(false);
+  const [isBroadcasting, setIsBroadcasting] = useState(false);
   const socketRef = useRef(null);
   const textareaRef = useRef(null);
   const recordingStartTimeRef = useRef(0);
@@ -392,6 +393,32 @@ const MeetingSandbox = () => {
     }
   };
 
+  const handleSpeakToAudience = async () => {
+    if (!transcription.trim()) return;
+
+    setIsBroadcasting(true);
+
+    try {
+      const backendURL = `http://localhost:8000/api/tts?text=${encodeURIComponent(transcription)}`;
+      // Leverage the native Audio object to stream directly from backend
+      const audio = new Audio(backendURL);
+
+      // Turn off the broadcasting signal when the audio ends
+      audio.onended = () => {
+        setIsBroadcasting(false);
+      };
+
+      audio.onerror = (e) => {
+        console.error("Playback error occurred:", e); // eslint-disable-line no-console
+        setIsBroadcasting(false);
+      };
+      await audio.play();
+    } catch (error) {
+      console.error("Failed to stream audio:", error); // eslint-disable-line no-console
+      setIsBroadcasting(false);
+    }
+  };
+
   return (
     <div className="meeting-sandbox">
       <h2>🎙️ VoiceBridge Sandbox View</h2>
@@ -572,6 +599,59 @@ const MeetingSandbox = () => {
             onChange={(e) => setTranscription(e.target.value)}
             aria-labelledby="transcribed-text-output"
           />
+
+          {/* TTS broadcast controls */}
+          <div className="tts-broadcast-container">
+            <button
+              className="recording-trigger-btn"
+              disabled={
+                !transcription.trim() ||
+                isBroadcasting ||
+                isRecording ||
+                isStreamingMode ||
+                status === "Processing audio..."
+              }
+              onClick={handleSpeakToAudience}
+              style={{
+                backgroundColor: isBroadcasting ? "#2563eb" : "#1e293b",
+                cursor:
+                  !transcription.trim() ||
+                  isBroadcasting ||
+                  status === "Processing audio..."
+                    ? "not-allowed"
+                    : "pointer",
+                padding: "0.6rem 2rem",
+                transition: "all 0.2s ease",
+              }}
+            >
+              <span className="btn-text">
+                {isBroadcasting ? "Broadcasting..." : "🗣️ Speak to Audience"}
+              </span>
+            </button>
+            {/* Visual Broadcasting Indicator */}
+            {isBroadcasting && (
+              <div
+                className="broadcasting-indicator"
+                style={{
+                  marginTop: "0.75rem",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "0.5rem",
+                  color: "#2563eb",
+                  justifyContent: "center",
+                }}
+                aria-live="polite"
+              >
+                <span
+                  className="pulse-indicator"
+                  style={{ backgroundColor: "#2563eb" }}
+                />
+                <strong style={{ fontSize: "1rem" }}>
+                  Broadcasting pipeline active...
+                </strong>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 

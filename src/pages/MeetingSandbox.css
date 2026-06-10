@@ -214,3 +214,8 @@
   outline-offset: 2px;
   box-shadow: none !important;
 }
+
+.tts-broadcast-container {
+  margin-top: 2rem;
+  text-align: center;
+}
