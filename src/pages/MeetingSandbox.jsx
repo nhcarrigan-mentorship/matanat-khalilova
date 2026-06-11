@@ -13,6 +13,8 @@ const MeetingSandbox = () => {
   const [user, setUser] = useState(null);
   const [isStreamingMode, setIsStreamingMode] = useState(false);
   const [isBroadcasting, setIsBroadcasting] = useState(false);
+  const [volume, setVolume] = useState(1); // 1 means 100% volume by default
+  const audioRef = useRef(null);
   const socketRef = useRef(null);
   const textareaRef = useRef(null);
   const recordingStartTimeRef = useRef(0);
@@ -74,6 +76,15 @@ const MeetingSandbox = () => {
         audioContextRef.current.state !== "closed"
       ) {
         audioContextRef.current.close();
+      }
+    };
+  }, []);
+
+  // Cleanup audio on component unmount so it doesn't leak memory or play forever
+  useEffect(() => {
+    return () => {
+      if (audioRef.current) {
+        audioRef.current.pause();
       }
     };
   }, []);
@@ -393,7 +404,18 @@ const MeetingSandbox = () => {
     }
   };
 
-  const handleSpeakToAudience = async () => {
+  const handleToggleBroadcast = async () => {
+    // if already playing, stop it immediately
+    if (isBroadcasting) {
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current = null;
+      }
+      setIsBroadcasting(false);
+      return;
+    }
+
+    // if idle, start playing
     if (!transcription.trim()) return;
 
     setIsBroadcasting(true);
@@ -403,21 +425,43 @@ const MeetingSandbox = () => {
       // Leverage the native Audio object to stream directly from backend
       const audio = new Audio(backendURL);
 
+      // Map our volume state to the audio element
+      audio.volume = volume;
+
+      audioRef.current = audio;
       // Turn off the broadcasting signal when the audio ends
       audio.onended = () => {
         setIsBroadcasting(false);
+        audioRef.current = null;
       };
 
       audio.onerror = (e) => {
         console.error("Playback error occurred:", e); // eslint-disable-line no-console
         setIsBroadcasting(false);
+        audioRef.current = null;
       };
       await audio.play();
     } catch (error) {
       console.error("Failed to stream audio:", error); // eslint-disable-line no-console
       setIsBroadcasting(false);
+      audioRef.current = null;
     }
   };
+
+  // Dynamically adjust volume if the user moves the slider while audio is playing
+  const handleVolumeChange = (e) => {
+    const newVolume = parseFloat(e.target.value);
+    setVolume(newVolume);
+    if (audioRef.current) {
+      audioRef.current.volume = newVolume;
+    }
+  };
+
+  const isBroadcastDisabled =
+    !transcription.trim() ||
+    isRecording ||
+    isStreamingMode ||
+    status === "Processing audio...";
 
   return (
     <div className="meeting-sandbox">
@@ -602,55 +646,105 @@ const MeetingSandbox = () => {
 
           {/* TTS broadcast controls */}
           <div className="tts-broadcast-container">
-            <button
-              className="recording-trigger-btn"
-              disabled={
-                !transcription.trim() ||
-                isBroadcasting ||
-                isRecording ||
-                isStreamingMode ||
-                status === "Processing audio..."
-              }
-              onClick={handleSpeakToAudience}
+            <div
               style={{
-                backgroundColor: isBroadcasting ? "#2563eb" : "#1e293b",
-                cursor:
-                  !transcription.trim() ||
-                  isBroadcasting ||
-                  status === "Processing audio..."
-                    ? "not-allowed"
-                    : "pointer",
-                padding: "0.6rem 2rem",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: "0.75rem",
+                marginBottom: "1.25rem",
+              }}
+            >
+              <label
+                htmlFor="tts-volume"
+                style={{
+                  fontSize: "0.8rem",
+                  fontWeight: "600",
+                  color: "#64748b",
+                  textTransform: "uppercase",
+                  letterSpacing: "0.5px",
+                  lineHeight: "1",
+                  userSelect: "none",
+                }}
+              >
+                Volume:
+              </label>
+              <input
+                id="tts-volume"
+                type="range"
+                min="0"
+                max="1"
+                step="0.1"
+                value={volume}
+                onChange={handleVolumeChange}
+                style={{
+                  cursor: "pointer",
+                  accentColor: isBroadcasting ? "#dc2626" : "#1e293b",
+                  margin: 0,
+                  width: "100%",
+                  maxWidth: "200px",
+                }}
+              />
+            </div>
+            <button
+              className="recording-trigger-btn btn-broadcast"
+              disabled={isBroadcastDisabled}
+              onClick={handleToggleBroadcast}
+              style={{
+                backgroundColor: isBroadcasting ? "#dc2626" : "#1e293b",
+                cursor: isBroadcastDisabled ? "not-allowed" : "pointer",
+                borderRadius: "8px",
+                width: "60%",
+                maxWidth: "300px",
+                padding: "0.8rem 2rem",
+                display: "inline-flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: "0.5rem",
+                border: "none",
                 transition: "all 0.2s ease",
               }}
             >
-              <span className="btn-text">
-                {isBroadcasting ? "Broadcasting..." : "🗣️ Speak to Audience"}
+              {isBroadcasting ? (
+                /* Live bouncing bars inside the button when active */
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "3px",
+                    height: "14px",
+                  }}
+                >
+                  <span className="wave-bar-btn"></span>
+                  <span className="wave-bar-btn"></span>
+                  <span className="wave-bar-btn"></span>
+                </div>
+              ) : (
+                /* Clean static icon when idle */
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  style={{ width: "1.1rem", height: "1.1rem", color: "#fff" }}
+                >
+                  <path d="M12 2v20M17 5v14M22 9v6M7 7v10M2 10v4" />
+                </svg>
+              )}
+              <span
+                className="btn-text"
+                style={{
+                  fontWeight: "600",
+                  letterSpacing: "0.5px",
+                  color: "#fff",
+                }}
+              >
+                {isBroadcasting ? "Stop Broadcasting" : "Speak to Audience"}
               </span>
             </button>
-            {/* Visual Broadcasting Indicator */}
-            {isBroadcasting && (
-              <div
-                className="broadcasting-indicator"
-                style={{
-                  marginTop: "0.75rem",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "0.5rem",
-                  color: "#2563eb",
-                  justifyContent: "center",
-                }}
-                aria-live="polite"
-              >
-                <span
-                  className="pulse-indicator"
-                  style={{ backgroundColor: "#2563eb" }}
-                />
-                <strong style={{ fontSize: "1rem" }}>
-                  Broadcasting pipeline active...
-                </strong>
-              </div>
-            )}
           </div>
         </div>
       </div>
