@@ -189,31 +189,6 @@
   }
 }
 
-/* 1. Default Focus Ring: When the button is idle (Purple) */
-.btn-mode-a:focus-visible {
-  outline: 2px solid #a78bfa !important; /* Soft purple ring */
-  outline-offset: 2px;
-}
-
-/* 2. Active Recording Focus Ring: Automatically snaps to red when listening */
-.btn-mode-a[style*="background-color: rgb(220, 38, 38)"]:focus-visible,
-.btn-mode-a[style*="background-color: #dc2626"]:focus-visible {
-  outline: 2px solid #f87171 !important; /* Soft red ring matching the active state */
-  outline-offset: 2px;
-  box-shadow: none !important;
-}
-
-.btn-mode-b-start:focus-visible {
-  outline: 2px solid #34d399 !important; /* Soft green ring */
-  outline-offset: 2px;
-}
-
-.btn-mode-b-stop:focus-visible {
-  outline: 2px solid #f87171 !important; /* Soft red ring */
-  outline-offset: 2px;
-  box-shadow: none !important;
-}
-
 .tts-broadcast-container {
   margin-top: 2rem;
   text-align: center;

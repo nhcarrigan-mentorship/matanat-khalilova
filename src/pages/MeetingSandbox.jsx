@@ -682,7 +682,7 @@ const MeetingSandbox = () => {
                   accentColor: isBroadcasting ? "#dc2626" : "#1e293b",
                   margin: 0,
                   width: "100%",
-                  maxWidth: "200px",
+                  maxWidth: "12.5rem",
                 }}
               />
             </div>
@@ -695,7 +695,7 @@ const MeetingSandbox = () => {
                 cursor: isBroadcastDisabled ? "not-allowed" : "pointer",
                 borderRadius: "8px",
                 width: "60%",
-                maxWidth: "300px",
+                maxWidth: "18.75rem",
                 padding: "0.8rem 2rem",
                 display: "inline-flex",
                 alignItems: "center",

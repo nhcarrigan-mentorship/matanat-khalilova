@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { useNavigate } from "react-router-dom";
 import "./LoginForm.css";
+import Logo from "../Logo";
 
 const LoginForm = () => {
   const navigate = useNavigate();
@@ -71,42 +72,55 @@ const LoginForm = () => {
 
   return (
     <div className="form-container">
-      <form onSubmit={handleSubmit}>
-        <h2>Log in to VoiceBridge</h2>
-        <label htmlFor="email">Email:</label>
-        <input
-          type="email"
-          id="email"
-          value={formData.email}
-          onChange={handleChange}
-          placeholder="email@example.com"
-          required
-        />
-        <label htmlFor="password">Password:</label>
-        <input
-          type="password"
-          id="password"
-          value={formData.password}
-          onChange={handleChange}
-          placeholder="Min 8 characters"
-          required
-        />
-        <button
-          type="submit"
-          disabled={loading}
-          className="signup-button"
-          aria-label={loading ? "Logging in, please wait" : "Log In"}
-        >
-          {loading ? "Logging in..." : "Log In"}
-        </button>
-        {error && <p style={{ color: "red", fontWeight: "bold" }}>{error}</p>}
-        <p>
-          New to VoiceBridge?{" "}
-          <Link to="/signup" className="auth-link">
-            Sign up
-          </Link>
-        </p>
-      </form>
+      <div className="auth-brand-side">
+        <div className="brand-content">
+          <Logo color="#ffffff" className="brand-large-logo" />
+          <h1>VoiceBridge</h1>
+          <p>Your voice, understood.</p>
+        </div>
+      </div>
+      <div className="auth-form-side">
+        <form onSubmit={handleSubmit}>
+          <div className="auth-header">
+            <Logo color="#a855f7" className="auth-logo" /> <h2>Welcome back</h2>
+          </div>
+          <label htmlFor="email">Email:</label>
+          <input
+            type="email"
+            id="email"
+            value={formData.email}
+            onChange={handleChange}
+            placeholder="email@example.com"
+            required
+          />
+          <label htmlFor="password">Password:</label>
+          <input
+            type="password"
+            id="password"
+            value={formData.password}
+            onChange={handleChange}
+            placeholder="Min 8 characters"
+            required
+          />
+          {error && (
+            <p style={{ color: "#dc2626", marginBottom: "0.5rem" }}>{error}</p>
+          )}
+          <button
+            type="submit"
+            disabled={loading}
+            className="signup-button"
+            aria-label={loading ? "Logging in, please wait" : "Log In"}
+          >
+            {loading ? "Logging in..." : "Log In"}
+          </button>
+          <p>
+            New to VoiceBridge?{" "}
+            <Link to="/signup" className="auth-link">
+              Sign up
+            </Link>
+          </p>
+        </form>
+      </div>
     </div>
   );
 };
