@@ -50,41 +50,71 @@ const Dashboard = () => {
   };
 
   return (
-    <div style={{ padding: "20px", textAlign: "center" }}>
-      <h1>Welcome, {user.name}!</h1>
-      <p>Your email: {user.email}</p>
-      <button
-        onClick={handleLogout}
-        className="logout-button"
-        aria-label={loading ? "Logging out, please wait" : "Log Out"}
-        disabled={loading}
-      >
-        {loading ? "Logging out..." : "Log Out"}
-      </button>
-      {!user.is_trained ? (
+    <div className="dashboard-container">
+      {/* Header Section */}
+      <header className="dashboard-header">
+        <h1>Welcome, {user.name}!</h1>
+        <p>Logged in as: {user.email}</p>
         <button
-          onClick={() => navigate("/train")}
-          className="train-button"
-          aria-label="Go to Voice Training Page"
+          onClick={handleLogout}
+          className="logout-button"
+          aria-label={loading ? "Logging out, please wait" : "Log Out"}
+          disabled={loading}
         >
-          Go to Training Page
+          {loading ? "Logging out..." : "Log Out"}
         </button>
-      ) : (
-        <div>
+      </header>
+
+      <div className="dashboard-grid">
+        {/* Card 1: Profile Setup / Profile View */}
+        <div className="action-card">
+          {!user.is_trained ? (
+            <>
+              <h3>Voice Training</h3>
+              <p>
+                Record sample sentences to analyze your speech patterns and
+                calibrate your personalized voice profile.
+              </p>
+              <button
+                onClick={() => navigate("/train")}
+                className="train-button"
+                aria-label="Go to Voice Training Page"
+              >
+                Get Started
+              </button>
+            </>
+          ) : (
+            <>
+              <h3>Voice Profile</h3>
+              <p>
+                Manage your active voice profile—review, fine-tune, or re-record
+                your voice baseline to continually optimize your results.
+              </p>
+              <button
+                onClick={() => navigate("/voice-profile")}
+                className="profile-button"
+              >
+                View My Profile
+              </button>
+            </>
+          )}
+        </div>
+
+        {/* Card 2: Sandbox Testing Area */}
+        <div className="action-card">
+          <h3>Meeting Sandbox</h3>
+          <p>
+            Stream your audio to test real-time transcription using either
+            instant single-burst or hands-free continuous modes.
+          </p>
           <button
-            onClick={() => navigate("/voice-profile")}
-            className="profile-button"
+            onClick={() => navigate("/meeting-sandbox")}
+            className="sandbox-button"
           >
-            View My Voice Profile
+            Enter Sandbox
           </button>
         </div>
-      )}
-      <button
-        onClick={() => navigate("/meeting-sandbox")}
-        className="sandbox-button"
-      >
-        Enter Meeting Sandbox
-      </button>
+      </div>
     </div>
   );
 };

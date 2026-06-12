@@ -9,7 +9,6 @@ body {
 .train-container {
   min-height: 80vh;
   padding: 2rem;
-  background-color: #ffffff;
   margin: 0 auto;
   text-align: center;
   display: flex;
