@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Link } from "react-router-dom";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import "./SignupForm.css";
 import Logo from "../Logo";
 
@@ -45,7 +44,7 @@ const SignupForm = () => {
       return;
     }
     setError("");
-    loading(true);
+    setLoading(true);
 
     try {
       const response = await fetch("http://localhost:8000/api/auth/signup", {
@@ -84,6 +83,8 @@ const SignupForm = () => {
 
         if (response.ok) {
           navigate("/dashboard");
+        } else {
+          // Not authenticated, stay on signup page
         }
       } catch (error) {
         // Error occurred, stay on signup page;
@@ -152,7 +153,6 @@ const SignupForm = () => {
           >
             {loading ? "Creating account..." : "Sign Up"}
           </button>
-
           <p>
             Already have an account?{" "}
             <Link to="/login" className="auth-link">

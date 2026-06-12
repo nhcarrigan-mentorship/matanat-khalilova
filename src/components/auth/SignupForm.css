@@ -24,7 +24,6 @@ input {
   height: 2.5rem;
   width: 100%;
   display: block;
-  box-sizing: border-box;
   border-radius: 0.25rem;
 }
 
@@ -88,7 +87,7 @@ form label {
   color: #37078b;
 }
 
-/* Centers the logo directly over your text header */
+/* Centers the logo directly over text header */
 .auth-header {
   display: flex;
   flex-direction: column;
@@ -183,6 +182,10 @@ form label {
     0 8px 10px -6px rgba(0, 0, 0, 0.03);
 }
 
+.signup-button:disabled {
+  cursor: wait;
+  opacity: 0.7;
+}
 /* mobile responsiveness fix */
 @media (max-width: 768px) {
   .form-container {

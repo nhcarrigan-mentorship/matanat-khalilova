@@ -103,7 +103,7 @@
   color: #ffffff;
   box-shadow: 0 0.25rem 0.875rem 0 rgba(16, 185, 129, 0.39);
 }
-.next-button:hover {
+.next-button:hover:not(:disabled) {
   background: #027b35 !important;
   box-shadow: 0 0.375rem 1.25rem rgba(16, 185, 129, 0.45);
 }
@@ -257,4 +257,32 @@ h2 {
   line-height: 1.4;
   font-style: italic;
   background-color: #f8fafc;
+}
+
+.stop-button:focus-visible,
+.stop-button:focus,
+.next-button:focus-visible,
+.next-button:focus,
+.record-button:focus-visible,
+.record-button:focus {
+  outline: none;
+  box-shadow: none;
+}
+
+.stop-button:focus-visible,
+.stop-button:focus {
+  outline: 2px solid #f87171;
+  outline-offset: 2px;
+}
+
+.next-button:focus-visible,
+.next-button:focus {
+  outline: 2px solid #34d399;
+  outline-offset: 2px;
+}
+
+.record-button:focus-visible,
+.record-button:focus {
+  outline: 2px solid #8345ed;
+  outline-offset: 2px;
 }
