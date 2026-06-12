@@ -1,3 +1,7 @@
+body {
+  background-color: #f8fafc;
+}
+
 .back-link {
   cursor: pointer;
   width: auto;

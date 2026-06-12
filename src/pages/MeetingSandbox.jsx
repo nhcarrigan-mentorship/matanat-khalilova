@@ -747,28 +747,30 @@ const MeetingSandbox = () => {
             </button>
           </div>
         </div>
+        {audioUrl && (
+          <div className="audio-review-section">
+            <h3 id="audio-review-title">Review Local Recording:</h3>
+            <audio
+              src={audioUrl}
+              controls
+              aria-labelledby="audio-review-title"
+              onLoadedMetadata={(e) => {
+                // If duration is infinite/unknown, trick the browser into calculating it instantly
+                if (
+                  e.target.duration === Infinity ||
+                  isNaN(e.target.duration)
+                ) {
+                  e.target.currentTime = 1e10; // Fast forward to the end
+                  e.target.onseeked = function () {
+                    e.target.currentTime = 0; // Snap right back to the beginning
+                    e.target.onseeked = null; // Unbind/kill the listener to avoid a loop
+                  };
+                }
+              }}
+            />
+          </div>
+        )}
       </div>
-
-      {audioUrl && (
-        <div className="audio-review-section">
-          <h3 id="audio-review-title">Review Local Recording:</h3>
-          <audio
-            src={audioUrl}
-            controls
-            aria-labelledby="audio-review-title"
-            onLoadedMetadata={(e) => {
-              // If duration is infinite/unknown, trick the browser into calculating it instantly
-              if (e.target.duration === Infinity || isNaN(e.target.duration)) {
-                e.target.currentTime = 1e10; // Fast forward to the end
-                e.target.onseeked = function () {
-                  e.target.currentTime = 0; // Snap right back to the beginning
-                  e.target.onseeked = null; // Unbind/kill the listener to avoid a loop
-                };
-              }
-            }}
-          />
-        </div>
-      )}
     </div>
   );
 };

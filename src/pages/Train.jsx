@@ -253,7 +253,7 @@ const Train = () => {
         </div>
       ) : (
         <div className="training-interface">
-          <h1>Training Phrases</h1>
+          <h1>Training Script</h1>
           <p className="instructions">
             Record each phrase to personalize your voice model.
           </p>

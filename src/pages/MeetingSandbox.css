@@ -1,3 +1,7 @@
+body {
+  background-color: #f8fafc;
+}
+
 .recording-trigger-btn {
   padding: 0.5rem 1.2rem;
   font-size: 1rem;
@@ -67,6 +71,7 @@
   padding: 2rem;
   border-radius: 0.5rem;
   text-align: center;
+  background-color: #fff;
 }
 
 .transcription-output {
@@ -97,7 +102,9 @@
 }
 
 .audio-review-section {
-  margin-top: 1.5rem;
+  margin-top: 3rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid #e2e8f0;
   text-align: center;
 }
 
