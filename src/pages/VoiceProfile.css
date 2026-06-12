@@ -125,10 +125,6 @@ p {
   text-align: center;
 }
 
-.train-voice-button:hover {
-  background-color: #6d28d9;
-}
-
 .training-control-card {
   margin-top: 2.5rem;
   padding: 1.5rem;
@@ -154,6 +150,38 @@ p {
   font-size: 1rem;
   color: #595e69;
   text-align: left;
+}
+
+.play-button:focus,
+.play-button:focus-visible,
+.replay-button:focus,
+.replay-button:focus-visible,
+.train-voice-button:focus,
+.train-voice-button:focus-visible,
+.train-button-link:focus,
+.train-button-link:focus-visible {
+  outline: none;
+  box-shadow: none;
+}
+
+.play-button:focus,
+.play-button:focus-visible,
+.replay-button:focus,
+.replay-button:focus-visible,
+.train-voice-button:focus,
+.train-voice-button:focus-visible,
+.train-button-link:focus,
+.train-button-link:focus-visible {
+  outline: 2px solid #a78bfa;
+  outline-offset: 2px;
+}
+
+.train-voice-button:hover:not(:disabled) {
+  background-color: #6d28d9 !important;
+}
+
+.train-voice-button:disabled {
+  pointer-events: none;
 }
 
 /* Responsive Tweak */

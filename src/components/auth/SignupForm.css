@@ -87,6 +87,11 @@ form label {
   color: #37078b;
 }
 
+.auth-link:focus {
+  outline: 2px solid #a78bfa;
+  outline-offset: 2px;
+}
+
 /* Centers the logo directly over text header */
 .auth-header {
   display: flex;
@@ -185,6 +190,18 @@ form label {
 .signup-button:disabled {
   cursor: wait;
   opacity: 0.7;
+}
+
+.signup-button:focus-visible,
+.signup-button:focus {
+  outline: none;
+  box-shadow: none;
+}
+
+.signup-button:focus-visible,
+.signup-button:focus {
+  outline: 2px solid #a78bfa;
+  outline-offset: 2px;
 }
 /* mobile responsiveness fix */
 @media (max-width: 768px) {

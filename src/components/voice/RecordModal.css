@@ -132,7 +132,7 @@
 
 .save-button:focus-visible,
 .save-button:focus {
-  outline: 2px solid #8345ed;
+  outline: 2px solid #a78bfa;
   outline-offset: 2px;
 }
 
