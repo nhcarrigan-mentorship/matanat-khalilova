@@ -1,6 +1,7 @@
 import React, { useRef } from "react";
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { clientFetch } from "../apiConfig";
 import WaveSurfer from "wavesurfer.js";
 import {
   Mic,
@@ -81,10 +82,9 @@ const Train = () => {
     formData.append("file", audioBlob, "recording.wav");
     formData.append("phrase_id", phrases[phraseIndex]._id); // Send phrase ID to backend
     try {
-      const response = await fetch("http://localhost:8000/api/upload-audio", {
+      const response = await clientFetch("/api/upload-audio", {
         method: "POST",
         body: formData,
-        credentials: "include",
       });
       const data = await response.json();
       console.log("Upload response:", data); // eslint-disable-line no-console
@@ -174,10 +174,7 @@ const Train = () => {
   useEffect(() => {
     const fetchUser = async () => {
       try {
-        const response = await fetch("http://localhost:8000/api/auth/me", {
-          method: "GET",
-          credentials: "include",
-        });
+        const response = await clientFetch("/api/auth/me");
         const data = await response.json();
 
         if (response.ok) {
@@ -207,10 +204,7 @@ const Train = () => {
   useEffect(() => {
     const fetchPhrases = async () => {
       try {
-        const response = await fetch("http://localhost:8000/api/phrases", {
-          method: "GET",
-          credentials: "include",
-        });
+        const response = await clientFetch("/api/phrases");
         const data = await response.json();
         if (response.ok) {
           setPhrases(data.phrases);
@@ -255,7 +249,8 @@ const Train = () => {
         <div className="training-interface">
           <h1>Training Script</h1>
           <p className="instructions">
-            Record each phrase to personalize your voice model.
+            Record each sample sentence to calibrate your personalized voice
+            profile.
           </p>
           <div className="phrase-box">
             <div className="phrase-status">

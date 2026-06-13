@@ -1,6 +1,18 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useNavigate, Link } from "react-router-dom";
+import { clientFetch } from "../apiConfig";
 import "./MeetingSandbox.css";
+
+const RAW_URL = process.env.REACT_APP_API_URL
+  ? process.env.REACT_APP_API_URL.replace(/^https?:\/\//, "")
+  : "localhost:8000";
+
+const WS_BASE_URL = process.env.REACT_APP_API_URL
+  ? `wss://${RAW_URL}`
+  : "ws://localhost:8000";
+const HTTP_BASE_URL = process.env.REACT_APP_API_URL
+  ? `https://${RAW_URL}`
+  : "http://localhost:8000";
 
 const MeetingSandbox = () => {
   const [isOptimized, setIsOptimized] = useState(false);
@@ -28,10 +40,7 @@ const MeetingSandbox = () => {
   useEffect(() => {
     const checkAuth = async () => {
       try {
-        const response = await fetch("http://localhost:8000/api/auth/me", {
-          method: "GET",
-          credentials: "include",
-        });
+        const response = await clientFetch("/api/auth/me");
         const data = await response.json();
 
         if (response.ok) {
@@ -198,14 +207,10 @@ const MeetingSandbox = () => {
         const formData = new FormData();
         formData.append("audio_file", audioBlob, "recording.webm");
 
-        const response = await fetch(
-          "http://localhost:8000/api/translate/instant",
-          {
-            method: "POST",
-            body: formData,
-            credentials: "include",
-          },
-        );
+        const response = await clientFetch("/api/translate/instant", {
+          method: "POST",
+          body: formData,
+        });
 
         const data = await response.json();
 
@@ -287,7 +292,7 @@ const MeetingSandbox = () => {
       localStreamRef.current = stream;
 
       // Create the native browser WebSocket connection
-      const ws = new WebSocket("ws://localhost:8000/api/stream");
+      const ws = new WebSocket(`${WS_BASE_URL}/api/stream`);
       socketRef.current = ws;
 
       ws.onopen = async () => {
@@ -421,7 +426,7 @@ const MeetingSandbox = () => {
     setIsBroadcasting(true);
 
     try {
-      const backendURL = `http://localhost:8000/api/tts?text=${encodeURIComponent(transcription)}`;
+      const backendURL = `${HTTP_BASE_URL}/api/tts?text=${encodeURIComponent(transcription)}`;
       // Leverage the native Audio object to stream directly from backend
       const audio = new Audio(backendURL);
 

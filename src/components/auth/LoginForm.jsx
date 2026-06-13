@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import "./LoginForm.css";
+import { clientFetch } from "../../apiConfig";
 import Logo from "../Logo";
 
 const LoginForm = () => {
@@ -26,9 +27,8 @@ const LoginForm = () => {
     setError("");
     setLoading(true);
     try {
-      const response = await fetch("http://localhost:8000/api/auth/login", {
+      const response = await clientFetch("/api/auth/login", {
         method: "POST",
-        credentials: "include",
         headers: {
           "Content-Type": "application/json",
         },
@@ -52,10 +52,7 @@ const LoginForm = () => {
   useEffect(() => {
     const checkAuth = async () => {
       try {
-        const response = await fetch("http://localhost:8000/api/auth/me", {
-          method: "GET",
-          credentials: "include",
-        });
+        const response = await clientFetch("/api/auth/me");
 
         if (response.ok) {
           navigate("/dashboard");

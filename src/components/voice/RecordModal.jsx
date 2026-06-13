@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { Mic, Square, X, Play, Pause, Save, FileAudio2 } from "lucide-react";
 import WaveSurfer from "wavesurfer.js";
 import "./RecordModal.css";
+import { clientFetch } from "../../apiConfig";
 import { validateAudio } from "../../utils/audioValidation";
 
 /*eslint-disable react/prop-types */
@@ -125,10 +126,9 @@ const RecordModal = ({ sample, onClose, onUpdateSuccess }) => {
     formData.append("file", audioBlob, "recording.wav");
     formData.append("phrase_id", sample._id); // Send phrase ID to backend
 
-    const response = await fetch("http://localhost:8000/api/upload-audio", {
+    const response = await clientFetch("/api/upload-audio", {
       method: "POST",
       body: formData,
-      credentials: "include",
     });
     if (!response.ok) {
       throw new Error(`Server responded with ${response.status}`);

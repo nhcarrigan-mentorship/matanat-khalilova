@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { clientFetch } from "../apiConfig";
 import "./Dashboard.css";
 
 const Dashboard = () => {
@@ -10,10 +11,7 @@ const Dashboard = () => {
   useEffect(() => {
     const checkAuth = async () => {
       try {
-        const response = await fetch("http://localhost:8000/api/auth/me", {
-          method: "GET",
-          credentials: "include",
-        });
+        const response = await clientFetch("/api/auth/me");
         const data = await response.json();
 
         if (response.ok) {
@@ -36,9 +34,8 @@ const Dashboard = () => {
   const handleLogout = async () => {
     setLoading(true);
     try {
-      await fetch("http://localhost:8000/api/auth/logout", {
+      await clientFetch("/api/auth/logout", {
         method: "POST",
-        credentials: "include",
       });
       setTimeout(() => {
         navigate("/login");

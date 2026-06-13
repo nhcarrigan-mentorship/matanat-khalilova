@@ -72,8 +72,9 @@ def read_root():
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        "http://localhost:3000"
-    ],  # set it to "https://www.voicebridge.com" in production
+        "http://localhost:3000",
+        "https://voicebridge.app-pages.workers.dev",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
