@@ -38,9 +38,12 @@ body {
   flex-direction: column;
   justify-content: center;
   align-items: center;
-  padding: 2rem;
+  padding: 3rem 2rem;
   width: 50vw;
-  height: 50vh;
+  max-width: 32.5rem;
+  min-width: 20rem;
+  height: auto;
+  min-height: 48vh;
   background-color: #f9f9f9;
   border: 0.15rem solid #ccc;
   border-radius: 1rem;
@@ -243,15 +246,18 @@ h2 {
 .current-step {
   background-color: #374151;
   color: #ffffff;
-  width: 2.8rem;
+  min-width: 2.8rem;
   height: 2.8rem;
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 50%;
+  border-radius: 9999px;
   font-size: 0.875rem;
   box-shadow: 0 0.25rem 0.75rem rgba(0, 0, 0, 0.1);
   border: 0.25rem solid #f3f4f6;
+  padding: 0 0.8rem;
+  white-space: nowrap;
+  line-height: 1;
 }
 
 .phrase-text {

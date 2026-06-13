@@ -114,7 +114,9 @@ p {
 
 .train-voice-button {
   margin: 2rem auto;
-  display: block;
+  display: flex;
+  justify-content: center;
+  align-items: center;
   background-color: #7c3aed;
   color: #ffffff !important;
   font-size: 0.95rem;
@@ -126,7 +128,6 @@ p {
   gap: 0.5rem;
   transition: all 0.2s ease-in-out;
   width: auto;
-  text-align: center;
 }
 
 .training-control-card {
@@ -138,6 +139,7 @@ p {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 2rem;
   box-shadow:
     0 4px 6px -1px rgba(0, 0, 0, 0.05),
     0 2px 4px -1px rgba(0, 0, 0, 0.03);
@@ -207,5 +209,14 @@ p {
   }
   to {
     transform: rotate(360deg);
+  }
+}
+
+@media (max-width: 768px) {
+  .train-voice-button {
+    width: 100%;
+    max-width: 18rem;
+    margin: 0 auto;
+    padding: 1rem 1.5rem;
   }
 }

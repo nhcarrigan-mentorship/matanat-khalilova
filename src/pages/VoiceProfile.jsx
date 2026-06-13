@@ -155,9 +155,7 @@ const VoiceProfile = () => {
       </button>
 
       <h1>
-        {user?.name
-          ? `${user.name}'s Voice Profile 🎙️`
-          : "Your Voice Profile 🎙️"}
+        {user?.name ? `${user.name}'s Voice Profile` : "Your Voice Profile"}
       </h1>
       <p>
         Review your samples below or re-record any if you would like to improve
