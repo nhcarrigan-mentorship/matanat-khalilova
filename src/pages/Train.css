@@ -18,6 +18,7 @@ body {
 }
 
 .phrase-box {
+  position: relative;
   width: 60vw;
   height: 40vh;
   margin: 1.5rem auto;
@@ -234,11 +235,12 @@ h2 {
 }
 
 .phrase-status {
+  position: absolute;
+  top: 1.25rem;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 0.5rem;
-  margin-bottom: 1rem;
   font-weight: 500;
   color: #6b7280; /* Neutral grey */
 }
@@ -261,6 +263,7 @@ h2 {
 }
 
 .phrase-text {
+  margin: 0;
   font-size: 1.5rem;
   color: #1f2937;
   line-height: 1.4;
