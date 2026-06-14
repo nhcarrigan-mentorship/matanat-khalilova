@@ -40,6 +40,11 @@ body {
   max-width: 50rem;
 }
 
+.meeting-sandbox h2 {
+  text-align: center;
+  font-size: 1.5rem;
+}
+
 .link {
   text-decoration: none;
   color: #2828c2;
@@ -72,6 +77,15 @@ body {
   border-radius: 0.5rem;
   text-align: center;
   background-color: #fff;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.recording-workspace audio {
+  width: 100%;
+  max-width: 20rem;
+  display: block;
+  margin: 1rem auto 0 auto;
 }
 
 .transcription-output {
@@ -273,4 +287,22 @@ body {
 #tts-volume:focus-visible {
   outline: 2px solid #64748b;
   outline-offset: 3px;
+}
+
+/* Add a responsive breakpoint for mobile screens */
+@media (max-width: 480px) {
+  .meeting-sandbox {
+    padding: 1rem;
+    width: 100%;
+    box-sizing: border-box;
+  }
+
+  .recording-workspace {
+    padding: 1.25rem 1rem;
+  }
+
+  .workspace-instruction {
+    font-size: 0.9rem;
+    word-break: break-word;
+  }
 }
