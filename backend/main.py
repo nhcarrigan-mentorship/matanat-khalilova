@@ -2,9 +2,10 @@ import io
 import os
 import re
 import time
+import uuid
 import wave
 from collections import defaultdict
-from datetime import datetime
+from datetime import datetime, timezone
 
 import bcrypt
 import cloudinary
@@ -16,6 +17,7 @@ from bson import ObjectId
 from dotenv import load_dotenv
 from fastapi import (
     APIRouter,
+    BackgroundTasks,
     Depends,
     FastAPI,
     File,
@@ -82,12 +84,16 @@ app.add_middleware(
 
 
 @app.get("/health")
-async def health_check():
+async def health_check(response: Response):
     try:
         await client.admin.command("ping")
         return {"status": "healthy", "database": "connected"}
     except Exception as e:
-        return {"status": "unhealthy", "database": str(e)}
+        print(f"HEALTH CHECK ERROR: {e}")
+
+        response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
+
+        return {"status": "unhealthy", "database": "Connection failed"}
 
 
 class UserSignup(BaseModel):
@@ -145,8 +151,8 @@ async def signup(user: UserSignup, response: Response):
         value=token,
         httponly=True,
         max_age=86400,  # 24 hours in seconds
-        samesite="lax",  # Helps prevent CSRF attacks
-        secure=False,  # Set to True while using https:// in production
+        samesite="none",  # Required for cross-domain (Cloudflare and Render)
+        secure=True,  # Required when samesite="none"
     )
 
     return {
@@ -178,8 +184,8 @@ async def login(response: Response, user: UserLogin):
         value=token,
         httponly=True,
         max_age=86400,  # 24 hours in seconds
-        samesite="lax",  # Helps prevent CSRF attacks
-        secure=False,  # Set to True while using https:// in production
+        samesite="none",
+        secure=True,
     )
 
     return {
@@ -202,8 +208,8 @@ async def logout(response: Response):
     response.delete_cookie(
         key="access_token",
         httponly=True,
-        samesite="lax",
-        secure=False,  # Set to True while using https:// in production
+        samesite="none",
+        secure=True,
     )
     return {"status": "success", "message": "Logged out successfully"}
 
@@ -259,7 +265,7 @@ async def upload_audio(
                     "audio_url": audio_url,
                     "is_validated": True,
                     "validation_error": None,
-                    "created_at": datetime.utcnow(),
+                    "created_at": datetime.now(timezone.utc),
                 }
             },
             upsert=True,
@@ -277,7 +283,11 @@ async def upload_audio(
         return {"status": "success", "url": audio_url, "count": sample_count}
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        print(f"CRITICAL ERROR: {e}")
+    raise HTTPException(
+        status_code=500,
+        detail="An unexpected server error occurred. Please try again later.",
+    )
 
 
 @app.get("/api/my-recordings")
@@ -320,13 +330,18 @@ async def get_user_recordings(current_user: dict = Depends(get_current_user_auth
                         else:
                             sample["text"] = f"Phrase {p_id} not found"
                 except Exception as e:
-                    sample["text"] = f"Error matching ID: {str(e)}"
+                    print(f"PHRASE MATCHING ERROR for sample {sample['_id']}: {e}")
+                    sample["text"] = "Error loading phrase text"
             else:
                 sample["text"] = "No phrase_id linked"
 
         return {"status": "success", "count": len(samples), "recordings": samples}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        print(f"CRITICAL ERROR: {e}")
+    raise HTTPException(
+        status_code=500,
+        detail="An unexpected server error occurred. Please try again later.",
+    )
 
 
 @app.post("/api/train-profile")
@@ -462,9 +477,10 @@ async def consecutive_translation(
         # Let FastAPI's intentional HTTPExceptions bypass the catch-all block
         raise
     except Exception as e:
+        print(f"CRITICAL ERROR: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error processing audio translation: {str(e)}",
+            detail="Error processing audio translation",
         )
 
 
@@ -692,18 +708,31 @@ async def websocket_endpoint(
         vad_iterator.reset_states()
 
 
+# Helper function to delete files after response is sent
+def remove_file(path: str):
+    try:
+        if os.path.exists(path):
+            os.remove(path)
+    except Exception as e:
+        print(f"Failed to delete temporary file {path}: {e}")
+
+
 @app.get("/api/tts")
-async def text_to_speech(text: str):
+async def text_to_speech(text: str, background_tasks: BackgroundTasks):
     if not text.strip():
         raise HTTPException(status_code=400, detail="Text parameter cannot be empty")
 
-    output_filename = "speech_output.mp3"
+    unique_id = uuid.uuid4().hex
+    output_filename = f"speech_{unique_id}.mp3"
 
     try:
         communicator = edge_tts.Communicate(text, "en-US-AriaNeural")
         await communicator.save(output_filename)
 
+        background_tasks.add_task(remove_file, output_filename)
+
         return FileResponse(output_filename, media_type="audio/mp3")
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"TTS Generation failed: {str(e)}")
+        print(f"CRITICAL ERROR: {e}")
+        raise HTTPException(status_code=500, detail="TTS Generation failed.")
