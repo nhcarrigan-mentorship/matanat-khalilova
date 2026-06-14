@@ -51,6 +51,12 @@ body {
   font-weight: 500;
 }
 
+.link:focus,
+.link:focus-visible {
+  outline: 2px solid #a78bfa;
+  outline-offset: 1px;
+}
+
 .info-banner-warning {
   background-color: #fff3cd;
   color: #856404;
