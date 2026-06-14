@@ -10,6 +10,7 @@ import {
 import { useNavigate } from "react-router-dom";
 import "./VoiceProfile.css";
 import RecordModal from "../components/voice/RecordModal.jsx";
+import { clientFetch } from "../apiConfig";
 
 const VoiceProfile = () => {
   const [recordings, setRecordings] = useState([]);
@@ -51,10 +52,7 @@ const VoiceProfile = () => {
   useEffect(() => {
     const checkAuth = async () => {
       try {
-        const response = await fetch("http://localhost:8000/api/auth/me", {
-          method: "GET",
-          credentials: "include",
-        });
+        const response = await clientFetch("/api/auth/me");
         const data = await response.json();
 
         if (response.ok) {
@@ -86,13 +84,7 @@ const VoiceProfile = () => {
     const fetchProfileStatus = async () => {
       try {
         // Fetch status from Backend API
-        const response = await fetch(
-          "http://localhost:8000/api/voice-profile/status",
-          {
-            method: "GET",
-            credentials: "include", // Send the HttpOnly cookie
-          },
-        );
+        const response = await clientFetch("/api/voice-profile/status");
         const data = await response.json();
         // Sync the state with the database truth
         if (response.ok) {
@@ -111,10 +103,7 @@ const VoiceProfile = () => {
 
   const fetchRecordings = async () => {
     try {
-      const response = await fetch("http://localhost:8000/api/my-recordings", {
-        method: "GET",
-        credentials: "include",
-      });
+      const response = await clientFetch("/api/my-recordings");
       const data = await response.json();
 
       if (response.ok && data.status === "success") {
@@ -136,9 +125,8 @@ const VoiceProfile = () => {
     window.currentAudio?.pause();
     setLoading(true);
     try {
-      const response = await fetch("http://localhost:8000/api/train-profile", {
+      const response = await clientFetch("/api/train-profile", {
         method: "POST",
-        credentials: "include",
       });
       const resPayload = await response.json();
       if (resPayload.status === "success") {
@@ -167,9 +155,7 @@ const VoiceProfile = () => {
       </button>
 
       <h1>
-        {user?.name
-          ? `${user.name}'s Voice Profile 🎙️`
-          : "Your Voice Profile 🎙️"}
+        {user?.name ? `${user.name}'s Voice Profile` : "Your Voice Profile"}
       </h1>
       <p>
         Review your samples below or re-record any if you would like to improve

@@ -1,3 +1,7 @@
+body {
+  background-color: #f8fafc;
+}
+
 .back-link {
   cursor: pointer;
   width: auto;
@@ -110,7 +114,9 @@ p {
 
 .train-voice-button {
   margin: 2rem auto;
-  display: block;
+  display: flex;
+  justify-content: center;
+  align-items: center;
   background-color: #7c3aed;
   color: #ffffff !important;
   font-size: 0.95rem;
@@ -122,11 +128,6 @@ p {
   gap: 0.5rem;
   transition: all 0.2s ease-in-out;
   width: auto;
-  text-align: center;
-}
-
-.train-voice-button:hover {
-  background-color: #6d28d9;
 }
 
 .training-control-card {
@@ -138,6 +139,7 @@ p {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 2rem;
   box-shadow:
     0 4px 6px -1px rgba(0, 0, 0, 0.05),
     0 2px 4px -1px rgba(0, 0, 0, 0.03);
@@ -154,6 +156,38 @@ p {
   font-size: 1rem;
   color: #595e69;
   text-align: left;
+}
+
+.play-button:focus,
+.play-button:focus-visible,
+.replay-button:focus,
+.replay-button:focus-visible,
+.train-voice-button:focus,
+.train-voice-button:focus-visible,
+.train-button-link:focus,
+.train-button-link:focus-visible {
+  outline: none;
+  box-shadow: none;
+}
+
+.play-button:focus,
+.play-button:focus-visible,
+.replay-button:focus,
+.replay-button:focus-visible,
+.train-voice-button:focus,
+.train-voice-button:focus-visible,
+.train-button-link:focus,
+.train-button-link:focus-visible {
+  outline: 2px solid #a78bfa;
+  outline-offset: 2px;
+}
+
+.train-voice-button:hover:not(:disabled) {
+  background-color: #6d28d9 !important;
+}
+
+.train-voice-button:disabled {
+  pointer-events: none;
 }
 
 /* Responsive Tweak */
@@ -175,5 +209,14 @@ p {
   }
   to {
     transform: rotate(360deg);
+  }
+}
+
+@media (max-width: 768px) {
+  .train-voice-button {
+    width: 100%;
+    max-width: 18rem;
+    margin: 0 auto;
+    padding: 1rem 1.5rem;
   }
 }

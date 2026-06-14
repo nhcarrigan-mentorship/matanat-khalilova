@@ -9,6 +9,7 @@ from datetime import datetime
 import bcrypt
 import cloudinary
 import cloudinary.uploader
+import edge_tts
 import numpy as np
 import torch
 from bson import ObjectId
@@ -27,6 +28,7 @@ from fastapi import (
     status,
 )
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 from pydantic import BaseModel, EmailStr, field_validator
 
 from audio_utils import (
@@ -70,8 +72,9 @@ def read_root():
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        "http://localhost:3000"
-    ],  # set it to "https://www.voicebridge.com" in production
+        "http://localhost:3000",
+        "https://voicebridge.app-pages.workers.dev",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -687,3 +690,20 @@ async def websocket_endpoint(
         print(f"Unexpected WebSocket error occurred: {str(e)}")
     finally:
         vad_iterator.reset_states()
+
+
+@app.get("/api/tts")
+async def text_to_speech(text: str):
+    if not text.strip():
+        raise HTTPException(status_code=400, detail="Text parameter cannot be empty")
+
+    output_filename = "speech_output.mp3"
+
+    try:
+        communicator = edge_tts.Communicate(text, "en-US-AriaNeural")
+        await communicator.save(output_filename)
+
+        return FileResponse(output_filename, media_type="audio/mp3")
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"TTS Generation failed: {str(e)}")

@@ -1,22 +1,17 @@
+/* Erase default browser body padding that forces scrollbars */
+html,
 body {
   margin: 0;
   padding: 0;
-}
-
-.form-container {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  min-height: 100vh;
-  background-color: #f9f9f9;
-}
-
-form {
   width: 100%;
-  max-width: 20rem;
-  padding: 2rem;
-  border: 1px solid #ddd;
-  border-radius: 0.5rem;
+  height: 100%;
+  box-sizing: border-box;
+}
+
+*,
+*:before,
+*:after {
+  box-sizing: inherit;
 }
 
 form h2 {
@@ -24,13 +19,12 @@ form h2 {
 }
 
 input {
+  border: 1px solid #a9a8a8;
   margin-bottom: 1rem;
   height: 2.5rem;
   width: 100%;
   display: block;
-  box-sizing: border-box;
   border-radius: 0.25rem;
-  border-color: #a9a8a8;
 }
 
 input:hover {
@@ -53,7 +47,6 @@ button {
   border-radius: 0.25rem;
   cursor: pointer;
   font-weight: bold;
-  border-radius: 0.25rem;
   transition: background-color 0.3s ease;
 }
 
@@ -63,7 +56,7 @@ button:hover {
 
 button:focus {
   outline: 1px solid #6d28d9;
-  box-shadow: 0 0 0 1.5px #6d28d9;
+  box-shadow: 0 0 0 1px #6d28d9;
 }
 
 form p {
@@ -92,4 +85,139 @@ form label {
 
 .auth-link:active {
   color: #37078b;
+}
+
+.auth-link:focus {
+  outline: 2px solid #a78bfa;
+  outline-offset: 2px;
+}
+
+/* Centers the logo directly over text header */
+.auth-header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  margin-bottom: 1.5rem;
+}
+
+/* Hard constraint to prevent the SVG from scaling out of control */
+.auth-logo {
+  width: 3.5rem !important;
+  height: 3.5rem !important;
+  display: block;
+  margin-bottom: 0.75rem;
+}
+
+/* Ensures the text lines up cleanly underneath */
+.auth-header h2 {
+  margin: 0;
+  font-size: 1.6rem;
+  font-weight: 700;
+  color: #1a1a1a;
+  text-align: center;
+}
+
+.form-container {
+  height: 100vh;
+  width: 100vw;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background: radial-gradient(circle, #fbfaff 0%, #f3f0ff 100%);
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+}
+
+.auth-brand-side {
+  flex: 1;
+  background: linear-gradient(135deg, #a855f7 0%, #6366f1 100%);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  padding: 3rem;
+  text-align: center;
+  color: #ffffff;
+  height: 100%; /* Keeps it locked to the container height */
+}
+
+.brand-large-logo {
+  width: 10.625rem !important;
+  height: 10.625rem !important;
+  margin-bottom: 0.5rem !important;
+  display: inline-block;
+}
+
+.auth-brand-side h1 {
+  font-size: 2.75rem;
+  font-weight: 800;
+  margin: 0 0 0.75rem 0;
+  letter-spacing: -0.02em;
+}
+
+.auth-brand-side p {
+  font-size: 1.15rem;
+  opacity: 0.97;
+  margin: 0;
+  font-weight: 400;
+}
+
+.auth-form-side {
+  flex: 1;
+  background-color: #f8fafc;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 2rem;
+  height: 100%;
+}
+
+.auth-form-side form {
+  background-color: #ffffff !important;
+  width: 100%;
+  max-width: 25rem;
+  padding: 2rem;
+  border-radius: 1rem;
+  border: 1px solid #e2e8f0;
+  box-shadow:
+    0 10px 25px -5px rgba(0, 0, 0, 0.05),
+    0 8px 10px -6px rgba(0, 0, 0, 0.03);
+}
+
+.signup-button:disabled {
+  cursor: wait;
+  opacity: 0.7;
+}
+
+.signup-button:focus-visible,
+.signup-button:focus {
+  outline: none;
+  box-shadow: none;
+}
+
+.signup-button:focus-visible,
+.signup-button:focus {
+  outline: 2px solid #a78bfa;
+  outline-offset: 2px;
+}
+/* mobile responsiveness fix */
+@media (max-width: 768px) {
+  .form-container {
+    flex-direction: column; /* Prepares layout to stack if needed */
+    height: auto; /* Breaks the rigid desktop height */
+    min-height: 100vh; /* Spans the whole screen */
+    overflow-y: auto; /* Allows natural scrolling on small phones */
+  }
+
+  .auth-brand-side {
+    display: none; /* Hides the massive left panel on mobile */
+  }
+
+  .auth-form-side {
+    width: 100%; /* Forces form side to take up the full screen */
+    padding: 1rem; /* Tighter padding so that the card fits well */
+  }
 }

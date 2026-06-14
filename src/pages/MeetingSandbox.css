@@ -1,3 +1,7 @@
+body {
+  background-color: #f8fafc;
+}
+
 .recording-trigger-btn {
   padding: 0.5rem 1.2rem;
   font-size: 1rem;
@@ -19,7 +23,6 @@
 .recording-trigger-btn:disabled {
   cursor: not-allowed !important;
   opacity: 0.4;
-  pointer-events: none; /* Prevents any accidental click or hover effects while locked */
 }
 
 #transcribed-text-output,
@@ -37,10 +40,21 @@
   max-width: 50rem;
 }
 
+.meeting-sandbox h2 {
+  text-align: center;
+  font-size: 1.5rem;
+}
+
 .link {
   text-decoration: none;
   color: #2828c2;
   font-weight: 500;
+}
+
+.link:focus,
+.link:focus-visible {
+  outline: 2px solid #a78bfa;
+  outline-offset: 1px;
 }
 
 .info-banner-warning {
@@ -68,6 +82,16 @@
   padding: 2rem;
   border-radius: 0.5rem;
   text-align: center;
+  background-color: #fff;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.recording-workspace audio {
+  width: 100%;
+  max-width: 20rem;
+  display: block;
+  margin: 1rem auto 0 auto;
 }
 
 .transcription-output {
@@ -98,7 +122,9 @@
 }
 
 .audio-review-section {
-  margin-top: 1.5rem;
+  margin-top: 3rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid #e2e8f0;
   text-align: center;
 }
 
@@ -190,27 +216,99 @@
   }
 }
 
-/* 1. Default Focus Ring: When the button is idle (Purple) */
+.tts-broadcast-container {
+  margin-top: 2rem;
+  text-align: center;
+}
+
+/* Animated Wave Bars Inside the Button */
+.wave-bar-btn {
+  display: inline-block;
+  width: 3px;
+  height: 14px;
+  background-color: #ffffff; /* Crisp white to pop off the red background */
+  border-radius: 1px;
+  animation: bounceWaveBtn 0.8s ease-in-out infinite;
+}
+
+.wave-bar-btn:nth-child(2) {
+  animation-delay: 0.15s;
+}
+
+.wave-bar-btn:nth-child(3) {
+  animation-delay: 0.3s;
+}
+
+@keyframes bounceWaveBtn {
+  0%,
+  100% {
+    transform: scaleY(0.4);
+  }
+  50% {
+    transform: scaleY(1.2);
+  }
+}
+
+.recording-trigger-btn:focus,
+.recording-trigger-btn:focus-visible,
+#tts-volume:focus,
+#tts-volume:focus-visible {
+  outline: none;
+  box-shadow: none;
+}
+
+/* 2. Mode A: Single Burst Button */
 .btn-mode-a:focus-visible {
-  outline: 2px solid #a78bfa !important; /* Soft purple ring */
+  outline: 2px solid #a78bfa; /* Elegant Purple ring when idle */
+  outline-offset: 2px;
+}
+.btn-mode-a[style*="background-color: #dc2626"]:focus-visible,
+.btn-mode-a[style*="background-color: rgb(220, 38, 38)"]:focus-visible {
+  outline: 2px solid #f87171; /* Smooth Red ring when listening */
   outline-offset: 2px;
 }
 
-/* 2. Active Recording Focus Ring: Automatically snaps to red when listening */
-.btn-mode-a[style*="background-color: rgb(220, 38, 38)"]:focus-visible,
-.btn-mode-a[style*="background-color: #dc2626"]:focus-visible {
-  outline: 2px solid #f87171 !important; /* Soft red ring matching the active state */
-  outline-offset: 2px;
-  box-shadow: none !important;
-}
-
+/* 3. Mode B: Continuous Streaming Buttons */
 .btn-mode-b-start:focus-visible {
-  outline: 2px solid #34d399 !important; /* Soft green ring */
+  outline: 2px solid #34d399; /* Vibrant Green ring for starting */
+  outline-offset: 2px;
+}
+.btn-mode-b-stop:focus-visible {
+  outline: 2px solid #f87171; /* Matching Red ring for stopping */
   outline-offset: 2px;
 }
 
-.btn-mode-b-stop:focus-visible {
-  outline: 2px solid #f87171 !important; /* Soft red ring */
+/* 4. TTS Broadcast Button (Speak to Audience) */
+.btn-broadcast:focus-visible {
+  outline: 2px solid #64748b; /* Sleek Slate-Gray ring matching its dark idle color */
   outline-offset: 2px;
-  box-shadow: none !important;
+}
+.btn-broadcast[style*="background-color: #dc2626"]:focus-visible,
+.btn-broadcast[style*="background-color: rgb(220, 38, 38)"]:focus-visible {
+  outline: 2px solid #f87171; /* Snaps to Red ring when actively broadcasting */
+  outline-offset: 2px;
+}
+
+/* 5. Volume Slider Control */
+#tts-volume:focus-visible {
+  outline: 2px solid #64748b;
+  outline-offset: 3px;
+}
+
+/* Add a responsive breakpoint for mobile screens */
+@media (max-width: 480px) {
+  .meeting-sandbox {
+    padding: 1rem;
+    width: 100%;
+    box-sizing: border-box;
+  }
+
+  .recording-workspace {
+    padding: 1.25rem 1rem;
+  }
+
+  .workspace-instruction {
+    font-size: 0.9rem;
+    word-break: break-word;
+  }
 }

@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from "react";
-import { Link } from "react-router-dom";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import "./SignupForm.css";
+import { clientFetch } from "../../apiConfig";
+import Logo from "../Logo";
 
 const SignupForm = () => {
   const navigate = useNavigate();
@@ -47,9 +48,8 @@ const SignupForm = () => {
     setLoading(true);
 
     try {
-      const response = await fetch("http://localhost:8000/api/auth/signup", {
+      const response = await clientFetch("/api/auth/signup", {
         method: "POST",
-        credentials: "include",
         headers: {
           "Content-Type": "application/json",
         },
@@ -76,10 +76,7 @@ const SignupForm = () => {
   useEffect(() => {
     const checkAuth = async () => {
       try {
-        const response = await fetch("http://localhost:8000/api/auth/me", {
-          method: "GET",
-          credentials: "include",
-        });
+        const response = await clientFetch("/api/auth/me");
 
         if (response.ok) {
           navigate("/dashboard");
@@ -95,53 +92,72 @@ const SignupForm = () => {
 
   return (
     <div className="form-container">
-      <form onSubmit={handleSubmit}>
-        <h2>Join VoiceBridge</h2>
-        <label htmlFor="name">Full Name:</label>
-        <input
-          type="text"
-          id="name"
-          value={formData.name}
-          onChange={handleChange}
-          placeholder="Enter your name"
-          required
-        />
-        <label htmlFor="email">Email:</label>
-        <input
-          type="email"
-          id="email"
-          value={formData.email}
-          onChange={handleChange}
-          placeholder="email@example.com"
-          required
-        />
-        <label htmlFor="password">Password:</label>
-        <input
-          type="password"
-          id="password"
-          value={formData.password}
-          onChange={handleChange}
-          placeholder="Min 8 characters"
-          required
-        />
-        {error && <p style={{ color: "red", fontWeight: "bold" }}>{error}</p>}
-        <button
-          type="submit"
-          className="signup-button"
-          disabled={loading}
-          aria-label={
-            loading ? "Creating your account, please wait" : "Sign Up"
-          }
-        >
-          {loading ? "Creating account..." : "Sign Up"}
-        </button>
-        <p>
-          Already have an account?{" "}
-          <Link to="/login" className="auth-link">
-            Log in
-          </Link>
-        </p>
-      </form>
+      <div className="auth-brand-side">
+        <div className="brand-content">
+          {/* Using Logo component here in pure white */}
+          <Logo color="#ffffff" className="brand-large-logo" />
+          <h1>VoiceBridge</h1>
+          <p>Your voice, understood.</p>
+        </div>
+      </div>
+      <div className="auth-form-side">
+        <form onSubmit={handleSubmit}>
+          {/* Brand header */}
+          <div className="auth-header">
+            <Logo color="#a855f7" className="auth-logo" />{" "}
+            <h2>Join VoiceBridge</h2>
+          </div>
+
+          <label htmlFor="name">Full Name:</label>
+          <input
+            type="text"
+            id="name"
+            value={formData.name}
+            onChange={handleChange}
+            placeholder="Enter your name"
+            required
+          />
+
+          <label htmlFor="email">Email:</label>
+          <input
+            type="email"
+            id="email"
+            value={formData.email}
+            onChange={handleChange}
+            placeholder="email@example.com"
+            required
+          />
+
+          <label htmlFor="password">Password:</label>
+          <input
+            type="password"
+            id="password"
+            value={formData.password}
+            onChange={handleChange}
+            placeholder="Min 8 characters"
+            required
+          />
+          {error && (
+            <p style={{ color: "#dc2626", marginBottom: "0.5rem" }}>{error}</p>
+          )}
+          <button
+            type="submit"
+            className="signup-button"
+            disabled={loading}
+            aria-label={
+              loading ? "Creating your account, please wait" : "Sign Up"
+            }
+          >
+            {loading ? "Creating account..." : "Sign Up"}
+          </button>
+          <p>
+            Already have an account?{" "}
+            <Link to="/login" className="auth-link">
+              Log in
+            </Link>
+          </p>
+        </form>
+      </div>
     </div>
   );
 };

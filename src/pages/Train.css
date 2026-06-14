@@ -1,3 +1,7 @@
+body {
+  background-color: #f8fafc;
+}
+
 .instructions {
   font-size: 1.2rem;
 }
@@ -5,7 +9,6 @@
 .train-container {
   min-height: 80vh;
   padding: 2rem;
-  background-color: #ffffff;
   margin: 0 auto;
   text-align: center;
   display: flex;
@@ -15,6 +18,7 @@
 }
 
 .phrase-box {
+  position: relative;
   width: 60vw;
   height: 40vh;
   margin: 1.5rem auto;
@@ -35,9 +39,12 @@
   flex-direction: column;
   justify-content: center;
   align-items: center;
-  padding: 2rem;
+  padding: 3rem 2rem;
   width: 50vw;
-  height: 50vh;
+  max-width: 32.5rem;
+  min-width: 20rem;
+  height: auto;
+  min-height: 48vh;
   background-color: #f9f9f9;
   border: 0.15rem solid #ccc;
   border-radius: 1rem;
@@ -103,7 +110,7 @@
   color: #ffffff;
   box-shadow: 0 0.25rem 0.875rem 0 rgba(16, 185, 129, 0.39);
 }
-.next-button:hover {
+.next-button:hover:not(:disabled) {
   background: #027b35 !important;
   box-shadow: 0 0.375rem 1.25rem rgba(16, 185, 129, 0.45);
 }
@@ -228,11 +235,12 @@ h2 {
 }
 
 .phrase-status {
+  position: absolute;
+  top: 1.25rem;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 0.5rem;
-  margin-bottom: 1rem;
   font-weight: 500;
   color: #6b7280; /* Neutral grey */
 }
@@ -240,21 +248,53 @@ h2 {
 .current-step {
   background-color: #374151;
   color: #ffffff;
-  width: 2.8rem;
+  min-width: 2.8rem;
   height: 2.8rem;
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 50%;
+  border-radius: 9999px;
   font-size: 0.875rem;
   box-shadow: 0 0.25rem 0.75rem rgba(0, 0, 0, 0.1);
   border: 0.25rem solid #f3f4f6;
+  padding: 0 0.8rem;
+  white-space: nowrap;
+  line-height: 1;
 }
 
 .phrase-text {
+  margin: 0;
   font-size: 1.5rem;
   color: #1f2937;
   line-height: 1.4;
   font-style: italic;
   background-color: #f8fafc;
+}
+
+.stop-button:focus-visible,
+.stop-button:focus,
+.next-button:focus-visible,
+.next-button:focus,
+.record-button:focus-visible,
+.record-button:focus {
+  outline: none;
+  box-shadow: none;
+}
+
+.stop-button:focus-visible,
+.stop-button:focus {
+  outline: 2px solid #f87171;
+  outline-offset: 2px;
+}
+
+.next-button:focus-visible,
+.next-button:focus {
+  outline: 2px solid #34d399;
+  outline-offset: 2px;
+}
+
+.record-button:focus-visible,
+.record-button:focus {
+  outline: 2px solid #a78bfa;
+  outline-offset: 2px;
 }

@@ -20,3 +20,6 @@ venv/
 build/
 dist/
 .vscode
+
+# Test files
+speech_output.mp3
