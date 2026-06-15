@@ -23,6 +23,7 @@ from fastapi import (
     File,
     Form,
     HTTPException,
+    Query,
     Response,
     UploadFile,
     WebSocket,
@@ -44,16 +45,14 @@ from database import client, db, phrases_collection, users_collection
 app = FastAPI()
 router = APIRouter()
 
-# Load environment variables from .env file
 load_dotenv()
 
-# Load the local Silero VAD model and utility function
-# (This downloads the model on the first startup, then reads from cache)
 VAD_MODEL, utils = torch.hub.load(
     repo_or_dir="snakers4/silero-vad",
     model="silero_vad",
     force_reload=False,
     trust_repo=True,
+    skip_validation=True,
 )
 
 get_speech_timestamps, save_audio, read_audio, VADIterator, collect_chunks = utils
@@ -90,19 +89,12 @@ async def health_check(response: Response):
         return {"status": "healthy", "database": "connected"}
     except Exception as e:
         print(f"HEALTH CHECK ERROR: {e}")
-
         response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
-
         return {"status": "unhealthy", "database": "Connection failed"}
 
 
 class UserSignup(BaseModel):
     name: str
-    email: EmailStr
-    password: str
-
-
-class UserLogin(BaseModel):
     email: EmailStr
     password: str
 
@@ -118,80 +110,62 @@ class UserLogin(BaseModel):
         return v
 
 
+class UserLogin(BaseModel):
+    email: EmailStr
+    password: str
+
+
 @app.post("/api/auth/signup")
-async def signup(user: UserSignup, response: Response):
-    # 1. Check if user already exists
+async def signup(user: UserSignup):
     existing_user = await users_collection.find_one({"email": user.email})
     if existing_user:
         raise HTTPException(status_code=400, detail="Email already registered")
 
-    # 2. Hash the password
     password_bytes = user.password.encode("utf-8")
     hashed_password = bcrypt.hashpw(password_bytes, bcrypt.gensalt()).decode("utf-8")
 
-    # 3. Create user document
     new_user = {
         "name": user.name,
         "email": user.email,
-        "password": hashed_password,  # Save the hash, not the plain text password
+        "password": hashed_password,
         "is_trained": False,
         "is_optimized": False,
         "correction_prompt": "",
         "correction_map": {},
     }
 
-    # 4. Save to MongoDB
     result = await users_collection.insert_one(new_user)
-
-    # 5. Create JWT token
     token = create_access_token(str(result.inserted_id))
-
-    response.set_cookie(
-        key="access_token",
-        value=token,
-        httponly=True,
-        max_age=86400,  # 24 hours in seconds
-        samesite="none",  # Required for cross-domain (Cloudflare and Render)
-        secure=True,  # Required when samesite="none"
-    )
 
     return {
         "status": "success",
         "message": f"Account created for {user.email}",
         "user_id": str(result.inserted_id),
+        "token": token,  # token returned in body
     }
 
 
 @app.post("/api/auth/login")
-async def login(response: Response, user: UserLogin):
-    # 1. Find user by email
+async def login(user: UserLogin):
     existing_user = await users_collection.find_one({"email": user.email})
     if not existing_user:
         raise HTTPException(
             status_code=400,
             detail="This email is not registered. Please sign up first.",
         )
-    # 2. Verify password
+
     password_bytes = user.password.encode("utf-8")
     stored_hashed_password = existing_user["password"].encode("utf-8")
     if not bcrypt.checkpw(password_bytes, stored_hashed_password):
         raise HTTPException(status_code=400, detail="Invalid email or password")
-    # 3. Create JWT token
-    token = create_access_token(str(existing_user["_id"]))
 
-    response.set_cookie(
-        key="access_token",
-        value=token,
-        httponly=True,
-        max_age=86400,  # 24 hours in seconds
-        samesite="none",
-        secure=True,
-    )
+    token = create_access_token(str(existing_user["_id"]))
 
     return {
         "status": "success",
         "message": f"Welcome back, {existing_user['name']}!",
         "user_id": str(existing_user["_id"]),
+        "token": token,  # token returned in body
     }
 
 
@@ -204,13 +178,7 @@ async def get_current_user_profile(current_user: dict = Depends(get_current_user
 
 
 @app.post("/api/auth/logout")
-async def logout(response: Response):
-    response.delete_cookie(
-        key="access_token",
-        httponly=True,
-        samesite="none",
-        secure=True,
-    )
+async def logout():
     return {"status": "success", "message": "Logged out successfully"}
 
 
@@ -505,9 +473,30 @@ def convert_raw_pcm_to_wav(pcm_array: np.ndarray) -> bytes:
 
 @app.websocket("/api/stream")
 async def websocket_endpoint(
-    websocket: WebSocket, current_user: dict = Depends(get_current_user_auth)
+    websocket: WebSocket,
+    token: str = Query(None),
 ):
+    if not token:
+        await websocket.close(code=4001, reason="Missing token")
+        return
+
+    from auth_utils import verify_access_token
+
+    user_id = verify_access_token(token)
+    if not user_id:
+        await websocket.close(code=4001, reason="Invalid or expired token")
+        return
+
+    user_profile = await users_collection.find_one({"_id": ObjectId(user_id)})
+    if not user_profile:
+        await websocket.close(code=4001, reason="User not found")
+        return
+
     await websocket.accept()
+
+    actual_user_id = str(user_profile["_id"])
+    correction_map = user_profile.get("correction_map", {})
+
     vad_iterator = VADIterator(
         VAD_MODEL, sampling_rate=16000, threshold=0.4, min_silence_duration_ms=1000
     )  # Slightly lower threshold for crisp speech capture
@@ -516,13 +505,6 @@ async def websocket_endpoint(
 
     # Initialize a local in-memory context storage for this specific stream
     session_history_segments = []
-
-    actual_user_id = current_user["user"]["id"]
-    user_profile = await users_collection.find_one({"_id": ObjectId(actual_user_id)})
-
-    correction_map = {}
-    if user_profile:
-        correction_map = user_profile.get("correction_map", {})
 
     master_pcm_stream = []
     vad_pointer = 0  # tracks how much data we've processed so far

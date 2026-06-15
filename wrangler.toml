@@ -1,0 +1,6 @@
+name = "voicebridge"
+compatibility_date = "2026-06-15"
+
+[assets]
+directory = "./build"
+not_found_handling = "single-page-application"

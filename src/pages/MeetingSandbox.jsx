@@ -292,7 +292,8 @@ const MeetingSandbox = () => {
       localStreamRef.current = stream;
 
       // Create the native browser WebSocket connection
-      const ws = new WebSocket(`${WS_BASE_URL}/api/stream`);
+      const token = localStorage.getItem("access_token");
+      const ws = new WebSocket(`${WS_BASE_URL}/api/stream?token=${token}`);
       socketRef.current = ws;
 
       ws.onopen = async () => {

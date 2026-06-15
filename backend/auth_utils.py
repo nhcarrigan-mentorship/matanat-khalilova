@@ -4,8 +4,7 @@ from datetime import datetime, timedelta, timezone
 import jwt
 from bson import ObjectId
 from dotenv import load_dotenv
-from fastapi import HTTPException
-from starlette.requests import HTTPConnection
+from fastapi import Header, HTTPException
 
 from database import users_collection
 
@@ -17,12 +16,10 @@ ALGORITHM = os.getenv("ALGORITHM")
 
 def create_access_token(user_id: str):
     expire = datetime.now(timezone.utc) + timedelta(hours=24)
-
     payload = {
         "sub": user_id,
         "exp": expire,
     }
-
     encoded_jwt = jwt.encode(payload, JWT_SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
 
@@ -38,14 +35,16 @@ def verify_access_token(token: str):
         return None
 
 
-async def get_current_user_auth(connection: HTTPConnection):
-    token = connection.cookies.get("access_token")
-    if not token:
+async def get_current_user_auth(authorization: str = Header(None)):
+    if not authorization or not authorization.startswith("Bearer "):
         raise HTTPException(status_code=401, detail="Not authenticated")
+
+    token = authorization.split(" ")[1]
 
     user_id = verify_access_token(token)
     if not user_id:
         raise HTTPException(status_code=401, detail="Invalid or expired token")
+
     user = await users_collection.find_one({"_id": ObjectId(user_id)})
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
