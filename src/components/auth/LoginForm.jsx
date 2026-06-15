@@ -37,9 +37,14 @@ const LoginForm = () => {
       const data = await response.json();
 
       if (response.ok) {
+        localStorage.setItem("access_token", data.token);
         navigate("/dashboard");
       } else {
-        setError(data.detail || "Login failed. Please try again.");
+        setError(
+          typeof data.detail === "string"
+            ? data.detail
+            : "Login failed. Please try again.",
+        );
       }
     } catch (error) {
       setError("An error occurred. Please try again later.");

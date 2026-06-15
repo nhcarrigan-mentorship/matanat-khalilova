@@ -58,10 +58,15 @@ const SignupForm = () => {
       const data = await response.json();
 
       if (response.ok) {
+        localStorage.setItem("access_token", data.token);
         setFormData({ name: "", email: "", password: "" });
         navigate("/dashboard");
       } else {
-        setError(data.detail || "Signup failed. Please try again.");
+        setError(
+          typeof data.detail === "string"
+            ? data.detail
+            : "Signup failed. Please try again.",
+        );
       }
     } catch (error) {
       setError("Cannot connect to the server. is the Backend running?");

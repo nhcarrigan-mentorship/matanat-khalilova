@@ -38,6 +38,7 @@ const Dashboard = () => {
         method: "POST",
       });
       setTimeout(() => {
+        localStorage.removeItem("access_token");
         navigate("/login");
         setLoading(false);
       }, 1000);
