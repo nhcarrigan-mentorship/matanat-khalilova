@@ -58,9 +58,6 @@ const SignupForm = () => {
       const data = await response.json();
 
       if (response.ok) {
-        alert(
-          `Success! Account created for ${formData.email}. Welcome to VoiceBridge, ${formData.name}!`,
-        );
         setFormData({ name: "", email: "", password: "" });
         navigate("/dashboard");
       } else {

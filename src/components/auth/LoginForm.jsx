@@ -38,9 +38,8 @@ const LoginForm = () => {
 
       if (response.ok) {
         navigate("/dashboard");
-        setFormData({ email: "", password: "" });
       } else {
-        setError(data.message || "Login failed. Please try again.");
+        setError(data.detail || "Login failed. Please try again.");
       }
     } catch (error) {
       setError("An error occurred. Please try again later.");
