@@ -54,6 +54,7 @@ VAD_MODEL, utils = torch.hub.load(
     model="silero_vad",
     force_reload=False,
     trust_repo=True,
+    skip_validation=True,  # Bypass GitHub API checks
 )
 
 get_speech_timestamps, save_audio, read_audio, VADIterator, collect_chunks = utils
@@ -101,11 +102,6 @@ class UserSignup(BaseModel):
     email: EmailStr
     password: str
 
-
-class UserLogin(BaseModel):
-    email: EmailStr
-    password: str
-
     @field_validator("password")
     @classmethod
     def password_strength(cls, v: str):
@@ -116,6 +112,11 @@ class UserLogin(BaseModel):
         if not re.search(r'[!@#$%^&*(),.?":{}|<>]', v):
             raise ValueError("Password must contain at least one special character")
         return v
+
+
+class UserLogin(BaseModel):
+    email: EmailStr
+    password: str
 
 
 @app.post("/api/auth/signup")

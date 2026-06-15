@@ -12,9 +12,9 @@ const Dashboard = () => {
     const checkAuth = async () => {
       try {
         const response = await clientFetch("/api/auth/me");
-        const data = await response.json();
 
         if (response.ok) {
+          const data = await response.json();
           setUser(data.user);
         } else {
           navigate("/login");
