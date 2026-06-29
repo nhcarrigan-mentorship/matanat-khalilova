@@ -21,6 +21,8 @@ const VoiceProfile = () => {
   const [hasPatterns, setHasPatterns] = useState(false);
   const [fetchingStatus, setFetchingStatus] = useState(true); // To handle initial loading blink
   const [loading, setLoading] = useState(false);
+  const [trainError, setTrainError] = useState(null);
+  const [failedPhrases, setFailedPhrases] = useState([]); // eslint-disable-line no-unused-vars
   const navigate = useNavigate();
 
   const handlePlay = (rec) => {
@@ -124,17 +126,87 @@ const VoiceProfile = () => {
     setIsPlaying(null); // Stop any playing audio
     window.currentAudio?.pause();
     setLoading(true);
+    setTrainError(null); // Clear any previous training errors before starting
+    setFailedPhrases([]); // Clear previous failed recording highlights
     try {
       const response = await clientFetch("/api/train-profile", {
         method: "POST",
       });
       const resPayload = await response.json();
+
+      // Handle HTTP errors (like the 400 Bad Request for low quality)
+      if (!response.ok) {
+        const detail = resPayload.detail;
+        let baseError = "Training failed. Please try again.";
+        let extractedIds = [];
+
+        // Parse detail safely whether it is an object, a JSON string or a plain string
+        if (detail) {
+          if (typeof detail === "object") {
+            baseError = detail.message || baseError;
+            extractedIds = detail.failed_ids || [];
+          } else {
+            try {
+              const parsed = JSON.parse(detail);
+              baseError = parsed.message || baseError;
+              extractedIds = parsed.failed_ids || [];
+            } catch (e) {
+              baseError = detail; // It was just a plain text string error
+            }
+          }
+        }
+
+        setFailedPhrases(extractedIds);
+
+        const finalMessage = (
+          <>
+            <div>{baseError}</div>
+
+            {extractedIds.length > 0 && (
+              <div
+                style={{
+                  marginTop: "0.4rem",
+                  fontWeight: "600",
+                  color: "#991b1b",
+                }}
+              >
+                Failed Recordings: {extractedIds.join(", ")}
+              </div>
+            )}
+
+            {isOptimized && (
+              <span
+                style={{
+                  display: "block",
+                  marginTop: "0.5rem",
+                  fontSize: "0.95rem",
+                  fontStyle: "italic",
+                  opacity: 0.85,
+                }}
+              >
+                {
+                  "Don't worry—we're keeping your previous voice profile active so your transcriptions stay accurate."
+                }
+              </span>
+            )}
+          </>
+        );
+
+        setTrainError(finalMessage);
+        return;
+      }
+
+      // Handle successful case
       if (resPayload.status === "success") {
         setIsOptimized(true);
         setHasPatterns(resPayload.data.has_patterns); // Update pattern status based on training results
+        setFailedPhrases([]); // Explicitly clean up on success
       }
     } catch (error) {
       console.error("Error training voice profile:", error); // eslint-disable-line no-console
+      setTrainError(
+        "A network error occurred while compiling your voice profile. Please try again.",
+      );
     } finally {
       setLoading(false);
     }
@@ -282,6 +354,27 @@ const VoiceProfile = () => {
           )}
         </button>
       </div>
+
+      {trainError && (
+        <div
+          className="training-error-alert"
+          role="alert"
+          style={{
+            backgroundColor: "#fef2f2",
+            border: "1px solid #fca5a5",
+            color: "#991b1b",
+            padding: "0.75rem",
+            borderRadius: "0.375rem",
+            marginBottom: "0.95rem",
+            marginTop: "1.5rem",
+            fontSize: "1rem",
+            lineHeight: "1.5",
+          }}
+        >
+          ⚠️ <strong style={{ fontSize: "1.1rem" }}>Calibration Note:</strong>{" "}
+          {trainError}
+        </div>
+      )}
 
       {recordings.length < 15 && (
         <p style={{ color: "#ce0b0b", fontSize: "1rem", marginTop: "0.5rem" }}>

@@ -345,8 +345,17 @@ async def train_profile(current_user: dict = Depends(get_current_user_auth)):
             },
         }
     except ValueError as val_err:
-        # Catches the specific "No validated samples found for this user." error
-        raise HTTPException(status_code=400, detail=str(val_err))
+        import json
+
+        try:
+            # If it's our rich JSON error dictionary,
+            # unpack it straight into the response
+            error_payload = json.loads(str(val_err))
+            raise HTTPException(status_code=400, detail=error_payload)
+        except Exception:
+            # Fallback for standard string ValueErrors
+            # (Catches the specific "No validated samples found for this user." error)
+            raise HTTPException(status_code=400, detail=str(val_err))
     except Exception as e:
         print(f"Error during profile training endpoint execution: {e}")
         raise HTTPException(
