@@ -16,7 +16,7 @@ except Exception as e:
     groq_client = None
 
 WHISPER_MODEL = "whisper-large-v3-turbo"
-FORMATTING_MODEL = "llama-3.1-8b-instant"
+FORMATTING_MODEL = "openai/gpt-oss-20b"
 
 
 async def transcribe_audio_bytes(
