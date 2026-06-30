@@ -414,6 +414,10 @@ const MeetingSandbox = () => {
     // if already playing, stop it immediately
     if (isBroadcasting) {
       if (audioRef.current) {
+        // Clean up listeners before pausing to avoid any lazy event triggers
+        audioRef.current.onended = null;
+        audioRef.current.onerror = null;
+
         audioRef.current.pause();
         audioRef.current = null;
       }
@@ -448,9 +452,40 @@ const MeetingSandbox = () => {
       };
       await audio.play();
     } catch (error) {
-      console.error("Failed to stream audio:", error); // eslint-disable-line no-console
+      // Check if it's just a rapid user toggle interruption
+      if (error.name === "AbortError") {
+        console.log("Audio playback was intentionally stopped while loading."); // eslint-disable-line no-console
+      } else {
+        // Log actual critical errors (network loss, missing endpoint, bad codecs)
+        console.error("Failed to stream audio:", error); // eslint-disable-line no-console
+      }
       setIsBroadcasting(false);
       audioRef.current = null;
+    }
+  };
+
+  const handleRewind = () => {
+    const audio = audioRef.current;
+
+    // Ensure the audio instance exists and has loaded enough metadata to seek
+    if (audio && audio.readyState >= 1) {
+      // Go back 5 seconds or snap to the beginning (0)
+      audio.currentTime = Math.max(0, audio.currentTime - 5);
+    }
+  };
+
+  const handleFastForward = () => {
+    const audio = audioRef.current;
+
+    // Ensure the audio instance exists and has loaded enough metadata to seek
+    if (audio && audio.readyState >= 1) {
+      const duration = audio.duration;
+
+      // Safety check: skip if duration is not a valid number yet
+      if (isNaN(duration) || !isFinite(duration)) return;
+
+      // Go forward 5 seconds or snap to the end if near completion
+      audio.currentTime = Math.min(duration, audio.currentTime + 5);
     }
   };
 
@@ -651,29 +686,31 @@ const MeetingSandbox = () => {
           />
 
           {/* TTS broadcast controls */}
-          <div className="tts-broadcast-container">
+          <div
+            className="tts-broadcast-container"
+            style={{ width: "100%", marginTop: "1rem" }}
+          >
+            {/* Volume Slider Row */}
             <div
               style={{
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
                 gap: "0.75rem",
-                marginBottom: "1.25rem",
+                marginBottom: "1.5rem",
               }}
             >
               <label
                 htmlFor="tts-volume"
                 style={{
-                  fontSize: "0.8rem",
-                  fontWeight: "600",
+                  fontSize: "0.75rem",
+                  fontWeight: "700",
                   color: "#64748b",
                   textTransform: "uppercase",
-                  letterSpacing: "0.5px",
-                  lineHeight: "1",
-                  userSelect: "none",
+                  letterSpacing: "0.05em",
                 }}
               >
-                Volume:
+                Volume
               </label>
               <input
                 id="tts-volume"
@@ -688,69 +725,141 @@ const MeetingSandbox = () => {
                   accentColor: isBroadcasting ? "#dc2626" : "#1e293b",
                   margin: 0,
                   width: "100%",
-                  maxWidth: "12.5rem",
+                  maxWidth: "12rem",
                 }}
               />
             </div>
-            <button
-              className="recording-trigger-btn btn-broadcast"
-              disabled={isBroadcastDisabled}
-              onClick={handleToggleBroadcast}
+
+            <div
+              className="tts-controls-row-deck"
               style={{
-                backgroundColor: isBroadcasting ? "#dc2626" : "#1e293b",
-                cursor: isBroadcastDisabled ? "not-allowed" : "pointer",
-                borderRadius: "8px",
+                gap: "0.75rem",
                 width: "100%",
-                maxWidth: "18.75rem",
-                padding: "0.8rem 1rem",
-                display: "inline-flex",
-                alignItems: "center",
-                justifyContent: "center",
-                gap: "0.5rem",
-                border: "none",
-                transition: "all 0.2s ease",
+                maxWidth: "24rem",
+                margin: "0 auto",
               }}
             >
-              {isBroadcasting ? (
-                /* Live bouncing bars inside the button when active */
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "3px",
-                    height: "14px",
-                  }}
+              {/* Rewind Button */}
+              {isBroadcasting && (
+                <button
+                  onClick={handleRewind}
+                  type="button"
+                  onMouseOver={(e) =>
+                    (e.currentTarget.style.backgroundColor = "#e2e8f0")
+                  }
+                  onMouseOut={(e) =>
+                    (e.currentTarget.style.backgroundColor = "#f1f5f9")
+                  }
+                  title="Rewind 5 seconds"
+                  className="rewind-btn"
                 >
-                  <span className="wave-bar-btn"></span>
-                  <span className="wave-bar-btn"></span>
-                  <span className="wave-bar-btn"></span>
-                </div>
-              ) : (
-                /* Clean static icon when idle */
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2.5"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  style={{ width: "1.1rem", height: "1.1rem", color: "#fff" }}
-                >
-                  <path d="M12 2v20M17 5v14M22 9v6M7 7v10M2 10v4" />
-                </svg>
+                  {/* Sleek Rewind SVG Icon */}
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    style={{ width: "1.15rem", height: "1.15rem" }}
+                  >
+                    <polygon points="11 19 2 12 11 5 11 19" />
+                    <polygon points="22 19 13 12 22 5 22 19" />
+                  </svg>
+                </button>
               )}
-              <span
-                className="btn-text"
+
+              {/* Main Broadcast Button */}
+              <button
+                className="recording-trigger-btn btn-broadcast"
+                disabled={isBroadcastDisabled}
+                onClick={handleToggleBroadcast}
                 style={{
-                  fontWeight: "600",
-                  letterSpacing: "0.5px",
-                  color: "#fff",
+                  backgroundColor: isBroadcasting ? "#dc2626" : "#1e293b",
+                  cursor: isBroadcastDisabled ? "not-allowed" : "pointer",
+                  borderRadius: "8px",
+                  width: "100%",
+                  maxWidth: "18rem",
+                  padding: "0.8rem 1rem",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: "0.5rem",
+                  border: "none",
+                  transition: "all 0.2s ease",
                 }}
               >
-                {isBroadcasting ? "Stop Broadcasting" : "Speak to Audience"}
-              </span>
-            </button>
+                {isBroadcasting ? (
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "3px",
+                      height: "14px",
+                    }}
+                  >
+                    <span className="wave-bar-btn"></span>
+                    <span className="wave-bar-btn"></span>
+                    <span className="wave-bar-btn"></span>
+                  </div>
+                ) : (
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    style={{ width: "1.1rem", height: "1.1rem", color: "#fff" }}
+                  >
+                    <path d="M12 2v20M17 5v14M22 9v6M7 7v10M2 10v4" />
+                  </svg>
+                )}
+                <span
+                  style={{
+                    fontWeight: "600",
+                    letterSpacing: "0.3px",
+                    color: "#fff",
+                    fontSize: "0.9rem",
+                  }}
+                >
+                  {isBroadcasting ? "Stop" : "Speak to Audience"}
+                </span>
+              </button>
+
+              {/* Fast-Forward Button */}
+              {isBroadcasting && (
+                <button
+                  onClick={handleFastForward}
+                  type="button"
+                  onMouseOver={(e) =>
+                    (e.currentTarget.style.backgroundColor = "#e2e8f0")
+                  }
+                  onMouseOut={(e) =>
+                    (e.currentTarget.style.backgroundColor = "#f1f5f9")
+                  }
+                  className="fast-forward-btn"
+                  title="Forward 5 seconds"
+                >
+                  {/* Sleek Fast Forward SVG Icon */}
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    style={{ width: "1.15rem", height: "1.15rem" }}
+                  >
+                    <polygon points="13 19 22 12 13 5 13 19" />
+                    <polygon points="2 19 11 12 2 5 2 19" />
+                  </svg>
+                </button>
+              )}
+            </div>
           </div>
         </div>
         {audioUrl && (

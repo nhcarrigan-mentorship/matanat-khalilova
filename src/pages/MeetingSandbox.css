@@ -252,7 +252,11 @@ body {
 .recording-trigger-btn:focus,
 .recording-trigger-btn:focus-visible,
 #tts-volume:focus,
-#tts-volume:focus-visible {
+#tts-volume:focus-visible,
+.fast-forward-btn:focus,
+.fast-forward-btn:focus-visible,
+.rewind-btn:focus,
+.rewind-btn:focus-visible {
   outline: none;
   box-shadow: none;
 }
@@ -293,6 +297,37 @@ body {
 #tts-volume:focus-visible {
   outline: 2px solid #64748b;
   outline-offset: 3px;
+}
+
+.fast-forward-btn,
+.rewind-btn {
+  width: 2.75rem;
+  height: 2.75rem;
+  min-width: 2.75rem;
+  border-radius: 50%;
+  background-color: #f1f5f9;
+  color: #dc2626;
+  border: 1px solid #e2e8f0;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  padding: 0;
+  outline: none;
+}
+
+.rewind-btn:focus-visible,
+.fast-forward-btn:focus-visible {
+  border-color: #dc2626;
+}
+
+.tts-controls-row-deck {
+  display: flex !important;
+  flex-direction: row !important;
+  justify-content: center;
+  align-items: center;
 }
 
 /* Add a responsive breakpoint for mobile screens */
