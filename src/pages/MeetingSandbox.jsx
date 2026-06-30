@@ -708,9 +708,11 @@ const MeetingSandbox = () => {
                   color: "#64748b",
                   textTransform: "uppercase",
                   letterSpacing: "0.05em",
+                  lineHeight: "1",
+                  userSelect: "none",
                 }}
               >
-                Volume
+                Volume:
               </label>
               <input
                 id="tts-volume"
