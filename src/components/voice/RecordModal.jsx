@@ -76,17 +76,42 @@ const RecordModal = ({ sample, onClose, onUpdateSuccess }) => {
     recordingStartTimeRef.current = Date.now();
     setIsUpdated(false);
     setAudioURL(null);
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    streamRef.current = stream;
-    mediaRecorderRef.current = new MediaRecorder(stream);
-    audioChunksRef.current = [];
-    mediaRecorderRef.current.ondataavailable = (event) => {
-      if (event.data.size > 0) {
-        audioChunksRef.current.push(event.data);
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      streamRef.current = stream;
+      mediaRecorderRef.current = new MediaRecorder(stream);
+      audioChunksRef.current = [];
+      mediaRecorderRef.current.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          audioChunksRef.current.push(event.data);
+        }
+      };
+      mediaRecorderRef.current.start();
+      setIsRecording(true);
+    } catch (err) {
+      console.error("Microphone access error in modal:", err); // eslint-disable-line no-console
+
+      if (
+        err.name === "NotAllowedError" ||
+        err.name === "PermissionDeniedError"
+      ) {
+        setError(
+          "Mic access denied. Please allow it in your browser settings to record.",
+        );
+      } else if (
+        err.name === "NotFoundError" ||
+        err.name === "DevicesNotFoundError"
+      ) {
+        setError("No microphone found. Please connect a recording device.");
+      } else {
+        setError(
+          "Unable to access your microphone. Please check your system settings.",
+        );
       }
-    };
-    mediaRecorderRef.current.start();
-    setIsRecording(true);
+
+      setIsRecording(false);
+    }
   };
 
   const stopRecording = () => {

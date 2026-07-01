@@ -70,8 +70,8 @@ const Dashboard = () => {
             <>
               <h3>Voice Training</h3>
               <p>
-                Record sample sentences to analyze your speech patterns and
-                calibrate your personalized voice profile.
+                Record sample sentences so the app can adapt to your speech
+                patterns and set up your profile.
               </p>
               <button
                 onClick={() => navigate("/train")}
@@ -85,8 +85,8 @@ const Dashboard = () => {
             <>
               <h3>Voice Profile</h3>
               <p>
-                Manage your active voice profile—review, fine-tune, or re-record
-                your voice baseline to continually optimize your results.
+                Manage your active voice profile—update your recordings and
+                retrain at any time to keep everything accurate.
               </p>
               <button
                 onClick={() => navigate("/voice-profile")}
@@ -102,8 +102,8 @@ const Dashboard = () => {
         <div className="action-card">
           <h3>Meeting Sandbox</h3>
           <p>
-            Stream your audio to test real-time transcription using either
-            instant single-burst or hands-free continuous modes.
+            Speak here to see and hear the real-time response using one-time
+            speech or continuous streaming mode.
           </p>
           <button
             onClick={() => navigate("/meeting-sandbox")}

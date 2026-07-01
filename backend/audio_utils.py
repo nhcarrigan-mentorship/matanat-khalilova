@@ -1,4 +1,5 @@
 import difflib
+import json
 import os
 import re
 
@@ -16,7 +17,7 @@ except Exception as e:
     groq_client = None
 
 WHISPER_MODEL = "whisper-large-v3-turbo"
-FORMATTING_MODEL = "llama-3.1-8b-instant"
+FORMATTING_MODEL = "openai/gpt-oss-20b"
 
 
 async def transcribe_audio_bytes(
@@ -160,6 +161,7 @@ async def process_voice_profile_training(user_id: str) -> dict:
 
     master_correction_map = {}
     successful_matches_count = 0
+    failed_phrase_ids = []
 
     """
     Initialize a reusable async HTTP client for downloading
@@ -170,17 +172,24 @@ async def process_voice_profile_training(user_id: str) -> dict:
             phrase_doc = await db.phrases.find_one(
                 {"_id": ObjectId(sample.get("phrase_id"))}
             )
+
+            p_id = phrase_doc.get("id") if phrase_doc else None
+
             original_text = phrase_doc.get("text") if phrase_doc else ""
             if not original_text:
                 print(
                     f"Warning: No matching phrase text found for phrase_id "
                     f"{sample.get('phrase_id')}"
                 )
+                if p_id is not None:
+                    failed_phrase_ids.append(p_id)  # Track skip
                 continue
             audio_url = sample.get("audio_url")
 
             if not audio_url:
                 print(f"Sample {sample['_id']} has no audio URL, skipping.")
+                if p_id is not None:
+                    failed_phrase_ids.append(p_id)  # Track skip
                 continue
             try:
                 # 2. Download the audio file from Cloudinary into memory(RAM)
@@ -190,6 +199,8 @@ async def process_voice_profile_training(user_id: str) -> dict:
                         f"Failed to download audio for sample {sample['_id']}, "
                         f"status code: {response.status_code}"
                     )
+                    if p_id is not None:
+                        failed_phrase_ids.append(p_id)  # Track skip
                     continue
 
                 audio_bytes = response.content  # our raw in-memory binary data
@@ -215,6 +226,8 @@ async def process_voice_profile_training(user_id: str) -> dict:
                         f"(Ratio: {match_ratio:.2f})."
                     )
                     print("Not counting toward calibration matrix.")
+                    if p_id is not None:
+                        failed_phrase_ids.append(p_id)  # Track skip
                     continue
 
                 master_correction_map.update(sample_map)
@@ -222,13 +235,24 @@ async def process_voice_profile_training(user_id: str) -> dict:
 
             except Exception as e:
                 print(f"Skipping sample {sample['_id']} due to error: {e}")
+                if p_id is not None:
+                    failed_phrase_ids.append(p_id)  # Track skip
                 continue
 
     if successful_matches_count < 10:
         raise ValueError(
-            f"Training failed. Audio quality was too low across your recordings. "
-            f"Only {successful_matches_count}/{len(samples)} samples passed validation."
-            f" Please check your voice profile and re-record your low-quality clips."
+            json.dumps(
+                {
+                    "message": (
+                        "Training failed. Audio quality was too low across "
+                        "your recordings. Only "
+                        f"{successful_matches_count}/{len(samples)} "
+                        "samples passed validation. Please check your voice "
+                        "profile and re-record your low-quality clips."
+                    ),
+                    "failed_ids": failed_phrase_ids,
+                }
+            )
         )
 
     # Initialize defaults
