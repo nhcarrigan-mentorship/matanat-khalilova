@@ -8,20 +8,20 @@ voice back.
 ## Features
 
 - **Voice Profile Training** — Record 15 voice samples to calibrate
-  the app to your unique speech patterns
+  the app to your unique speech patterns.
 - **Smart Training Validation** — Automatic audio quality checks
-  ensure only clean samples are used for training
+  ensure only clean samples are used for training.
 - **Voice Pattern Training** — Builds a personalized correction
-  map using Groq Whisper and difflib pattern matching
+  map using Groq Whisper and difflib pattern matching.
 - **AI Speech Correction Pipeline** — Whisper transcribes raw audio,
-  a Python correction engine replaces known mispronounced words using
+  a Python correction engine replaces atypical speech patterns using
   your personal speech profile, then an LLM refines punctuation and
-  capitalization for natural readability
-- **Single Take Mode** — Record a complete train of thought and receive the full transcription once you finalize
+  capitalization for natural readability.
+- **Single Take Mode** — Record a complete train of thought and receive the full transcription once you finalize.
 - **Continuous Streaming Mode** — Live transcription that appears
-  on screen in real time as you speak
+  on screen in real time as you speak.
 - **Text-to-Speech Output** — Natural-sounding voice output via
-  edge-tts neural voices
+  edge-tts neural voices.
 
 ## Live Demo
 
@@ -109,7 +109,7 @@ In the project directory, you can run the following commands:
 | `npm run format`       | **Fixes** code formatting automatically using Prettier.           |
 | `npm run format:check` | **Verifies** that the code follows formatting rules (used by CI). |
 | `npm run build`        | Builds the app for production.                                    |
-| `npm test`             | Runs the test suite (currently set to placeholder).               |
+| `npm test`             | Runs the audio validation test suite.                             |
 
 #### Backend
 
@@ -130,18 +130,18 @@ In the project directory, you can run the following commands:
 
 ## Usage
 
-1. Sign up and create your account
-2. Go to **Voice Training** — record your 15 voice samples
+1. Sign up and create your account.
+2. Go to **Voice Training** — record your 15 voice samples.
 3. Navigate to **Voice Profile** — review your recordings and
-   re-record any samples you are not satisfied with
-4. Click **"Train My Voice"** to generate your personalized speech correction profile
-5. Go to **Meeting Sandbox** to start transcribing your speech in real time
+   re-record any samples you are not satisfied with.
+4. Click **"Train My Voice"** to generate your personalized speech correction profile.
+5. Go to **Meeting Sandbox** to start transcribing your speech in real time.
 6. Use Single Take or Continuous Mode depending on your needs:
-   - **Single Take** — Speak at your own pace, then finalize to receive the full transcription at once
+   - **Single Take** — Speak at your own pace, then finalize to receive the full transcription at once.
    - **Continuous** — Live streaming that detects sentences
-     automatically as you speak
+     automatically as you speak.
 7. Review the transcribed text, edit if needed, then click
-   **"Speak to Audience"** to broadcast as natural-sounding audio
+   **"Speak to Audience"** to broadcast as natural-sounding audio.
 
 ## Project Structure
 
