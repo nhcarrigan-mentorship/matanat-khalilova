@@ -13,8 +13,11 @@ voice back.
   ensure only clean samples are used for training
 - **Voice Pattern Training** — Builds a personalized correction
   map using Groq Whisper and difflib pattern matching
-- **Single Take Mode** — Speak at your own pace, then finalize
-  to receive the full transcription at once
+- **AI Speech Correction Pipeline** — Whisper transcribes raw audio,
+  a Python correction engine replaces known mispronounced words using
+  your personal speech profile, then an LLM refines punctuation and
+  capitalization for natural readability
+- **Single Take Mode** — Record a complete train of thought and receive the full transcription once you finalize
 - **Continuous Streaming Mode** — Live transcription that appears
   on screen in real time as you speak
 - **Text-to-Speech Output** — Natural-sounding voice output via
@@ -58,7 +61,15 @@ git clone https://github.com/nhcarrigan-mentorship/matanat-khalilova.git
 cd matanat-khalilova
 ```
 
-### 2. Install Dependencies
+### 2. Set Up Environment Variables
+
+```bash
+cp .env.example .env
+```
+
+Open `.env` and fill in your API keys and configuration values.
+
+### 3. Install Dependencies
 
 To get the full-stack environment ready, you must install dependencies for both the frontend and the backend.
 
@@ -85,7 +96,7 @@ python -m venv venv
 pip install -r requirements.txt
 ```
 
-### 3. Available Scripts
+### 4. Available Scripts
 
 In the project directory, you can run the following commands:
 
@@ -112,7 +123,7 @@ In the project directory, you can run the following commands:
 | `bandit -r .`               | Security scan that checks for common vulnerabilities in Python code. |
 | `python -c "..."`           | Environment Check to verify core libraries are correctly installed.  |
 
-### 4. Code Quality Tools
+### 5. Code Quality Tools
 
 - **JavaScript**: **ESLint 8** is used for linting to ensure clean and consistent code.
 - **Python**: **PEP8** standards are adhered to by using a suite of quality tools. **Black** is used for formatting, **isort** for import organization, **Flake8** for linting and **Bandit** for automated security vulnerability scanning. Configuration settings can be found in `pyproject.toml` and `.flake8`.
