@@ -1,8 +1,43 @@
 # 🎙️ VoiceBridge
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+An AI-powered communication tool that transforms dysarthric or
+difficult-to-understand speech into clear, natural-sounding audio
+in real time — giving users with speech impairments their digital
+voice back.
 
-Empowering individuals with speech disabilities by transforming atypical speech into clear, effective communication.
+## Features
+
+- **Voice Profile Training** — Record 15 voice samples to calibrate
+  the app to your unique speech patterns
+- **Smart Training Validation** — Automatic audio quality checks
+  ensure only clean samples are used for training
+- **Voice Pattern Training** — Builds a personalized correction
+  map using Groq Whisper and difflib pattern matching
+- **Single Take Mode** — Speak at your own pace, then finalize
+  to receive the full transcription at once
+- **Continuous Streaming Mode** — Live transcription that appears
+  on screen in real time as you speak
+- **Text-to-Speech Output** — Natural-sounding voice output via
+  edge-tts neural voices
+
+## Live Demo
+
+[voicebridge.app-pages.workers.dev](https://voicebridge.app-pages.workers.dev)
+
+## Technologies Used
+
+- **React** — Frontend
+- **Python + FastAPI** — Backend
+- **MongoDB Atlas** — Database
+- **Groq Whisper Large v3 Turbo** — Speech-to-Text
+- **GPT OSS 20B via Groq** — LLM post-processing
+- **edge-tts** — Text-to-Speech
+- **Silero VAD** — Voice Activity Detection for real-time sentence boundary detection
+- **Cloudinary** — Audio storage
+- **WebSockets** — Real-time streaming
+- **Cloudflare Workers** — Frontend deployment
+- **Render** — Backend deployment
+- **GitHub Actions** — CI/CD
 
 ## Installation & Setup
 
@@ -10,9 +45,11 @@ Follow these steps to get your local development environment running.
 
 ### Prerequisites
 
-- **Node.js**: Version 18.x or higher is required to match our CI environment.
-- **npm**: Usually comes bundled with Node.js.
-- **Python**: Version 3.11+ (if working on AI/Speech backend logic).
+- **Node.js** — Version 18.x or higher
+- **npm** — Included with Node.js
+- **Python** — Version 3.10+
+- **MongoDB Atlas** — Free account at cloud.mongodb.com
+- **Groq API Key** — Free at console.groq.com
 
 ### 1. Clone the Repository
 
@@ -77,5 +114,48 @@ In the project directory, you can run the following commands:
 
 ### 4. Code Quality Tools
 
-- **JavaScript**: We use **ESLint 8** for linting to ensure clean and consistent code.
-- **Python**: We adhere to **PEP8** standards by using a suite of quality tools. We use **Black** for formatting, **isort** for import organization, **Flake8** for linting and **Bandit** for automated security vulnerability scanning. Configuration settings can be found in `pyproject.toml` and `.flake8`.
+- **JavaScript**: **ESLint 8** is used for linting to ensure clean and consistent code.
+- **Python**: **PEP8** standards are adhered to by using a suite of quality tools. **Black** is used for formatting, **isort** for import organization, **Flake8** for linting and **Bandit** for automated security vulnerability scanning. Configuration settings can be found in `pyproject.toml` and `.flake8`.
+
+## Usage
+
+1. Sign up and create your account
+2. Go to **Voice Training** — record your 15 voice samples
+3. Navigate to **Voice Profile** — review your recordings and
+   re-record any samples you are not satisfied with
+4. Click **"Train My Voice"** to generate your personalized speech correction profile
+5. Go to **Meeting Sandbox** to start transcribing your speech in real time
+6. Use Single Take or Continuous Mode depending on your needs:
+   - **Single Take** — Speak at your own pace, then finalize to receive the full transcription at once
+   - **Continuous** — Live streaming that detects sentences
+     automatically as you speak
+7. Review the transcribed text, edit if needed, then click
+   **"Speak to Audience"** to broadcast as natural-sounding audio
+
+## Project Structure
+
+```
+voice-bridge/
+├── src/                  # React frontend
+│   ├── components/
+│   ├── pages/
+│   └── utils/
+├── public/               # Static assets
+├── backend/              # FastAPI backend
+│   ├── main.py           # API routes & endpoints
+│   ├── audio_utils.py    # Groq + VAD pipeline
+│   └── requirements.txt
+└── .env.example          # Environment variables template
+```
+
+## Contributing
+
+Contributions are not open at this time, but may be welcomed in the future. Stay tuned! 💜
+
+## License
+
+[![MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT) — see [LICENSE](LICENSE)
+
+## Contact
+
+Matanat Khalilova — [LinkedIn](https://www.linkedin.com/in/matanatkhalil/)
