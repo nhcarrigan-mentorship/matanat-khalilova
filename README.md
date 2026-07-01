@@ -113,15 +113,15 @@ In the project directory, you can run the following commands:
 
 #### Backend
 
-| Command                     | Description                                                          |
-| :-------------------------- | :------------------------------------------------------------------- |
-| `uvicorn main:app --reload` | Starts the FastAPI development server.                               |
-| `pytest`                    | Runs the backend test suite.                                         |
-| `black .`                   | Formats Python code according to standards.                          |
-| `flake8 .`                  | Lints the code to check for PEP8 style violations.                   |
-| `isort .`                   | Sorts imports alphabetically and into logical groups.                |
-| `bandit -r .`               | Security scan that checks for common vulnerabilities in Python code. |
-| `python -c "..."`           | Environment Check to verify core libraries are correctly installed.  |
+| Command                                                            | Description                                                          |
+| :----------------------------------------------------------------- | :------------------------------------------------------------------- |
+| `uvicorn main:app --reload`                                        | Starts the FastAPI development server.                               |
+| `pytest`                                                           | Runs the backend test suite.                                         |
+| `black .`                                                          | Formats Python code according to standards.                          |
+| `flake8 .`                                                         | Lints the code to check for PEP8 style violations.                   |
+| `isort .`                                                          | Sorts imports alphabetically and into logical groups.                |
+| `bandit -r .`                                                      | Security scan that checks for common vulnerabilities in Python code. |
+| `python -c "import fastapi, torch, groq; print('Environment OK')"` | Environment Check to verify core libraries are correctly installed.  |
 
 ### 5. Code Quality Tools
 
