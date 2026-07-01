@@ -102,8 +102,8 @@ const Dashboard = () => {
         <div className="action-card">
           <h3>Meeting Sandbox</h3>
           <p>
-            Speak here to see and hear the real-time response using push-to-talk
-            or hands-free mode.
+            Speak here to see and hear the real-time response using one-time
+            speech or continuous streaming mode.
           </p>
           <button
             onClick={() => navigate("/meeting-sandbox")}

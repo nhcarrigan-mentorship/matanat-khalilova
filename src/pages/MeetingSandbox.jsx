@@ -540,8 +540,8 @@ const MeetingSandbox = () => {
         <div className="mode-container" style={{ marginBottom: "2rem" }}>
           <p className="workspace-instruction">
             {isRecording
-              ? "Release to finalize"
-              : "Mode A: Single Burst Speech (Instant)"}
+              ? "Click to finish"
+              : "Mode A: One-Time Speech (Single Take)"}
           </p>
           <button
             className="recording-trigger-btn btn-mode-a"
@@ -578,7 +578,7 @@ const MeetingSandbox = () => {
                 ? "Listening..."
                 : audioUrl
                   ? "Re-try"
-                  : "Hold to Talk"}
+                  : "Click to Talk"}
             </span>
           </button>
         </div>
@@ -595,7 +595,7 @@ const MeetingSandbox = () => {
           <p className="workspace-instruction">
             {isStreamingMode
               ? "Continuous mode is active. Speak freely..."
-              : "Mode B: Continuous Streaming Speech (Hands-Free)"}
+              : "Mode B: Continuous Streaming Speech (Live Updates)"}
           </p>
           {!isStreamingMode ? (
             <button

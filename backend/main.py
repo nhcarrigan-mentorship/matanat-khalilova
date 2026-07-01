@@ -431,6 +431,8 @@ async def consecutive_translation(
         raw_transcription = await transcribe_audio_bytes(
             audio_bytes, filename=audio_file.filename
         )
+        print(f"[DEBUG LOG] WHISPER RAW: '{raw_transcription}'")
+
         # 3. Query MongoDB for this authenticated user's profile correction_prompt
         user_profile = await users_collection.find_one(
             {"_id": ObjectId(actual_user_id)}
