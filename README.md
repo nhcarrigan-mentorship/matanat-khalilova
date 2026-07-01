@@ -148,15 +148,16 @@ In the project directory, you can run the following commands:
 ```
 voice-bridge/
 ├── src/                  # React frontend
-│   ├── components/
-│   ├── pages/
-│   └── utils/
+│   ├── components/       # Modular UI components
+│   ├── pages/            # Application view layouts
+│   └── utils/            # Frontend audio validation logic
 ├── public/               # Static assets
+│   └── index.html        # Main HTML entry point & Cloudflare analytics setup
 ├── backend/              # FastAPI backend
-│   ├── main.py           # API routes & endpoints
-│   ├── audio_utils.py    # Groq + VAD pipeline
-│   └── requirements.txt
-└── .env.example          # Environment variables template
+│   ├── main.py           # Core API endpoints & VAD processing logic
+│   ├── audio_utils.py    # Groq transcription & audio helper functions
+│   └── requirements.txt  # Python package dependencies
+└── .env.example          # Environment variables configuration template
 ```
 
 ## Contributing
