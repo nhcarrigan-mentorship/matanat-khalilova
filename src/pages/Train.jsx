@@ -2,7 +2,7 @@ import React, { useRef } from "react";
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { clientFetch } from "../apiConfig";
-import WaveSurfer from "wavesurfer.js";
+import WaveformPlayer from "../components/voice/WaveformPlayer";
 import {
   Mic,
   Square,
@@ -123,58 +123,6 @@ const Train = () => {
 
   const togglePlay = () => {
     setIsPlaying(!isPlaying);
-  };
-
-  /*eslint-disable react/prop-types */
-  const WaveformPlayer = ({ url, isPlaying, onFinish }) => {
-    const containerRef = useRef(null);
-    const waveSurferRef = useRef(null);
-
-    useEffect(() => {
-      if (!containerRef.current) return;
-      // Create the waveform visualizer
-      const ws = WaveSurfer.create({
-        container: containerRef.current,
-        waveColor: "#babdc1", // Light grey for the background waves
-        progressColor: "#8b5cf6", // Purple for the played part
-        cursorColor: "transparent",
-        barWidth: 3, // Make it look like bars
-        barRadius: 3,
-        responsive: true,
-        height: 40,
-        normalize: true, // Make quiet recordings look better
-      });
-
-      waveSurferRef.current = ws;
-      ws.load(url).catch((err) => {
-        if (err.name !== "AbortError") {
-          console.error("WaveSurfer error:", err); // eslint-disable-line no-console
-        }
-      });
-
-      ws.on("finish", () => {
-        onFinish(); // Start listening
-      });
-
-      return () => {
-        ws.un("finish"); // Stop listening (remove the ear)
-        ws.destroy(); // Delete the whole player
-      };
-    }, [url, onFinish]);
-
-    useEffect(() => {
-      if (waveSurferRef.current) {
-        if (isPlaying) {
-          waveSurferRef.current.play();
-        } else {
-          waveSurferRef.current.pause();
-        }
-      }
-    }, [isPlaying]);
-
-    return (
-      <div ref={containerRef} style={{ width: "100%", cursor: "pointer" }} />
-    );
   };
 
   const handleNextAction = async () => {

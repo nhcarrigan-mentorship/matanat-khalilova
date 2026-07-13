@@ -10,9 +10,6 @@ const RAW_URL = process.env.REACT_APP_API_URL
 const WS_BASE_URL = process.env.REACT_APP_API_URL
   ? `wss://${RAW_URL}`
   : "ws://localhost:8000";
-const HTTP_BASE_URL = process.env.REACT_APP_API_URL
-  ? `https://${RAW_URL}`
-  : "http://localhost:8000";
 
 const MeetingSandbox = () => {
   const [isOptimized, setIsOptimized] = useState(false);
@@ -177,6 +174,11 @@ const MeetingSandbox = () => {
     setStatus("Processing audio...");
     setIsRecording(false);
 
+    // Latency: the button release is the end of speech in Mode A, so the clock
+    // starts here. Measured in the browser, not the server, so it includes the
+    // upload of the recording, which the backend cannot see.
+    const speechEndTime = Date.now();
+
     // Arm the handler first to ensure we capture the final chunks before the stream is killed
     mediaRecorderRef.current.onstop = async () => {
       // Turn off microphone hardware stream lights immediately
@@ -217,6 +219,15 @@ const MeetingSandbox = () => {
         if (response.ok) {
           setTranscription(data.corrected_text || "No transcription returned.");
           setStatus("Idle");
+
+          // Latency: button release -> text on screen. Stopped here, at the
+          // moment the transcription is handed to React to render.
+          const totalMs = Date.now() - speechEndTime;
+          // eslint-disable-next-line no-console
+          console.log(
+            `[LATENCY] Mode A total=${totalMs}ms ` +
+              `${totalMs <= 3000 ? "OK" : "OVER 3s BUDGET"}`,
+          );
         } else {
           setStatus(`Error: ${data.detail || "Unknown backend error."}`);
         }
@@ -419,6 +430,8 @@ const MeetingSandbox = () => {
         audioRef.current.onerror = null;
 
         audioRef.current.pause();
+        // Release the blob created for this playback
+        URL.revokeObjectURL(audioRef.current.src);
         audioRef.current = null;
       }
       setIsBroadcasting(false);
@@ -431,22 +444,41 @@ const MeetingSandbox = () => {
     setIsBroadcasting(true);
 
     try {
-      const backendURL = `${HTTP_BASE_URL}/api/tts?text=${encodeURIComponent(transcription)}`;
-      // Leverage the native Audio object to stream directly from backend
-      const audio = new Audio(backendURL);
+      // /api/tts requires a bearer token, and an Audio element cannot send
+      // one, so fetch the mp3 through clientFetch and play it from a blob.
+      // The text goes in a JSON body so long transcripts are not limited by
+      // the URL length cap.
+      const response = await clientFetch("/api/tts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: transcription }),
+      });
 
-      // Map our volume state to the audio element
+      if (!response.ok) {
+        // Surface the backend's reason (e.g. the text is over the length limit)
+        const errorBody = await response.json().catch(() => ({}));
+        throw new Error(
+          errorBody.detail || `Speech synthesis failed (${response.status})`,
+        );
+      }
+
+      const objectUrl = URL.createObjectURL(await response.blob());
+      const audio = new Audio(objectUrl);
+
+      // Map volume state to the audio element
       audio.volume = volume;
 
       audioRef.current = audio;
       // Turn off the broadcasting signal when the audio ends
       audio.onended = () => {
+        URL.revokeObjectURL(objectUrl);
         setIsBroadcasting(false);
         audioRef.current = null;
       };
 
       audio.onerror = (e) => {
         console.error("Playback error occurred:", e); // eslint-disable-line no-console
+        URL.revokeObjectURL(objectUrl);
         setIsBroadcasting(false);
         audioRef.current = null;
       };
@@ -458,6 +490,8 @@ const MeetingSandbox = () => {
       } else {
         // Log actual critical errors (network loss, missing endpoint, bad codecs)
         console.error("Failed to stream audio:", error); // eslint-disable-line no-console
+        // Tell the user why, instead of silently doing nothing
+        setStatus(error.message || "Speech synthesis failed.");
       }
       setIsBroadcasting(false);
       audioRef.current = null;

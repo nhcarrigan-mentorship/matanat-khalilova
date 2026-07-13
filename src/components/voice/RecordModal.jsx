@@ -1,62 +1,11 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useRef, useState } from "react";
 import { Mic, Square, X, Play, Pause, Save, FileAudio2 } from "lucide-react";
-import WaveSurfer from "wavesurfer.js";
 import "./RecordModal.css";
 import { clientFetch } from "../../apiConfig";
 import { validateAudio } from "../../utils/audioValidation";
+import WaveformPlayer from "./WaveformPlayer";
 
 /*eslint-disable react/prop-types */
-const WaveformPlayer = ({ url, isPlaying, onFinish }) => {
-  const containerRef = useRef(null);
-  const waveSurferRef = useRef(null);
-
-  useEffect(() => {
-    if (!containerRef.current) return;
-    // Create the waveform visualizer
-    const ws = WaveSurfer.create({
-      container: containerRef.current,
-      waveColor: "#babdc1",
-      progressColor: "#8b5cf6",
-      cursorColor: "transparent",
-      barWidth: 3,
-      barRadius: 3,
-      responsive: true,
-      height: 40,
-      normalize: true,
-    });
-
-    waveSurferRef.current = ws;
-    ws.load(url).catch((err) => {
-      if (err.name !== "AbortError") {
-        console.error("WaveSurfer error:", err); // eslint-disable-line no-console
-      }
-    });
-
-    ws.on("finish", () => {
-      onFinish();
-    });
-
-    return () => {
-      ws.un("finish"); // Stop listening (remove the ear)
-      ws.destroy(); // Delete the whole player
-    };
-  }, [url, onFinish]);
-
-  useEffect(() => {
-    if (waveSurferRef.current) {
-      if (isPlaying) {
-        waveSurferRef.current.play();
-      } else {
-        waveSurferRef.current.pause();
-      }
-    }
-  }, [isPlaying]);
-
-  return (
-    <div ref={containerRef} style={{ width: "100%", cursor: "pointer" }} />
-  );
-};
-
 const RecordModal = ({ sample, onClose, onUpdateSuccess }) => {
   // eslint-disable-next-line
   const [isRecording, setIsRecording] = useState(false);
