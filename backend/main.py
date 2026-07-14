@@ -252,10 +252,10 @@ async def upload_audio(
 
     except Exception as e:
         print(f"CRITICAL ERROR: {e}")
-    raise HTTPException(
-        status_code=500,
-        detail="An unexpected server error occurred. Please try again later.",
-    )
+        raise HTTPException(
+            status_code=500,
+            detail="An unexpected server error occurred. Please try again later.",
+        )
 
 
 @app.get("/api/my-recordings")
@@ -306,10 +306,10 @@ async def get_user_recordings(current_user: dict = Depends(get_current_user_auth
         return {"status": "success", "count": len(samples), "recordings": samples}
     except Exception as e:
         print(f"CRITICAL ERROR: {e}")
-    raise HTTPException(
-        status_code=500,
-        detail="An unexpected server error occurred. Please try again later.",
-    )
+        raise HTTPException(
+            status_code=500,
+            detail="An unexpected server error occurred. Please try again later.",
+        )
 
 
 @app.post("/api/train-profile")
@@ -525,6 +525,12 @@ async def websocket_endpoint(
     # Tracks accumulated silent samples
     consecutive_silence_samples = 0
 
+    # Latency: a mic produces samples in real time, so sample N of this stream
+    # was spoken at stream_start + N / 16000. That lets to measure from the
+    # moment the user stopped speaking rather than from when we noticed
+    stream_start = time.perf_counter()
+    stream_offset = 0  # Samples already trimmed off the front of master_pcm_stream
+
     try:
         while True:
             data = await websocket.receive_bytes()
@@ -629,14 +635,21 @@ async def websocket_endpoint(
                 )
 
                 if len(current_sentence) > 8000:
+                    # Latency: wall-clock instant the user actually stopped talking
+                    speech_end_perf = (
+                        stream_start + (stream_offset + sentence_end) / 16000
+                    )
+
                     wav_bytes = convert_raw_pcm_to_wav(current_sentence)
                     print(
                         f"Sending segment ({len(current_sentence)} samples) to Groq..."
                     )
 
+                    transcribe_start = time.perf_counter()
                     raw_transcription = await transcribe_audio_bytes(
                         wav_bytes, filename=f"sentence_{actual_user_id}.wav"
                     )
+                    transcribe_ms = (time.perf_counter() - transcribe_start) * 1000
                     print(f"[DEBUG LOG] WHISPER RAW: '{raw_transcription}'")
 
                     clean_txt = raw_transcription.strip().lower().strip(".,!?")
@@ -650,6 +663,7 @@ async def websocket_endpoint(
                     # if there is no prior talk, whisper likely hallucinated
                     if clean_txt in banned_words and not session_history_segments:
                         print("Dropped silent hallucination anomaly.")
+                        stream_offset += vad_pointer  # Keep the latency clock in sync
                         master_pcm_stream = master_pcm_stream[vad_pointer:]
                         vad_pointer = 0
                         active_speech_start = None
@@ -659,11 +673,13 @@ async def websocket_endpoint(
                     # Combine history list into a clean string context
                     historical_context = " ".join(session_history_segments[-2:])
 
+                    refine_start = time.perf_counter()
                     final_output = await refine_transcription(
                         raw_transcription=raw_transcription,
                         correction_map=correction_map,
                         history_context=historical_context,
                     )
+                    refine_ms = (time.perf_counter() - refine_start) * 1000
                     print(f"[DEBUG LOG] LLM REFINED: '{final_output}'")
 
                     if final_output.strip() and final_output.strip() != ".":
@@ -671,8 +687,22 @@ async def websocket_endpoint(
                         session_history_segments.append(final_output.strip())
                         await websocket.send_text(f"{final_output}")
 
+                        # Latency: speech end -> text on the wire. vad_lag is the
+                        # 1s silence Silero waits out before calling the sentence
+                        # over, and it is the floor of what we can achieve here.
+                        total_ms = (time.perf_counter() - speech_end_perf) * 1000
+                        vad_lag_ms = total_ms - transcribe_ms - refine_ms
+                        print(
+                            f"[LATENCY] total={total_ms:.0f}ms "
+                            f"(vad_lag={vad_lag_ms:.0f}ms "
+                            f"transcribe={transcribe_ms:.0f}ms "
+                            f"refine={refine_ms:.0f}ms) "
+                            f"{'OK' if total_ms <= 3000 else 'OVER 3s BUDGET'}"
+                        )
+
                 # Clear the entire evaluated window and drop pointers to 0
                 # guarantees next loop iteration is perfectly 1:1 synced with Silero
+                stream_offset += vad_pointer  # Keep the latency clock in sync
                 master_pcm_stream = master_pcm_stream[vad_pointer:]
                 vad_pointer = 0
                 active_speech_start = None
@@ -710,10 +740,36 @@ def remove_file(path: str):
         print(f"Failed to delete temporary file {path}: {e}")
 
 
-@app.get("/api/tts")
-async def text_to_speech(text: str, background_tasks: BackgroundTasks):
+# Roughly 15-20 minutes of speech. Far beyond any realistic single broadcast
+MAX_TTS_CHARS = 15000
+
+
+class TTSRequest(BaseModel):
+    text: str
+
+
+@app.post("/api/tts")
+async def text_to_speech(
+    payload: TTSRequest,
+    background_tasks: BackgroundTasks,
+    current_user: dict = Depends(get_current_user_auth),
+):
+    # POST with a JSON body rather than a query string: the text is not capped
+    # by the ~8KB request-line limit, is not written to access logs, and is not
+    # cached by proxies. It also lets the client send a bearer token.
+    text = payload.text
+
     if not text.strip():
         raise HTTPException(status_code=400, detail="Text parameter cannot be empty")
+
+    if len(text) > MAX_TTS_CHARS:
+        raise HTTPException(
+            status_code=413,
+            detail=(
+                f"Text is too long to speak at once "
+                f"({len(text)} characters, limit is {MAX_TTS_CHARS})."
+            ),
+        )
 
     unique_id = uuid.uuid4().hex
     output_filename = f"speech_{unique_id}.mp3"

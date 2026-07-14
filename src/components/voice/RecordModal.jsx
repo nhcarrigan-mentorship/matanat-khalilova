@@ -1,62 +1,11 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useRef, useState, useEffect } from "react";
 import { Mic, Square, X, Play, Pause, Save, FileAudio2 } from "lucide-react";
-import WaveSurfer from "wavesurfer.js";
 import "./RecordModal.css";
 import { clientFetch } from "../../apiConfig";
 import { validateAudio } from "../../utils/audioValidation";
+import WaveformPlayer from "./WaveformPlayer";
 
 /*eslint-disable react/prop-types */
-const WaveformPlayer = ({ url, isPlaying, onFinish }) => {
-  const containerRef = useRef(null);
-  const waveSurferRef = useRef(null);
-
-  useEffect(() => {
-    if (!containerRef.current) return;
-    // Create the waveform visualizer
-    const ws = WaveSurfer.create({
-      container: containerRef.current,
-      waveColor: "#babdc1",
-      progressColor: "#8b5cf6",
-      cursorColor: "transparent",
-      barWidth: 3,
-      barRadius: 3,
-      responsive: true,
-      height: 40,
-      normalize: true,
-    });
-
-    waveSurferRef.current = ws;
-    ws.load(url).catch((err) => {
-      if (err.name !== "AbortError") {
-        console.error("WaveSurfer error:", err); // eslint-disable-line no-console
-      }
-    });
-
-    ws.on("finish", () => {
-      onFinish();
-    });
-
-    return () => {
-      ws.un("finish"); // Stop listening (remove the ear)
-      ws.destroy(); // Delete the whole player
-    };
-  }, [url, onFinish]);
-
-  useEffect(() => {
-    if (waveSurferRef.current) {
-      if (isPlaying) {
-        waveSurferRef.current.play();
-      } else {
-        waveSurferRef.current.pause();
-      }
-    }
-  }, [isPlaying]);
-
-  return (
-    <div ref={containerRef} style={{ width: "100%", cursor: "pointer" }} />
-  );
-};
-
 const RecordModal = ({ sample, onClose, onUpdateSuccess }) => {
   // eslint-disable-next-line
   const [isRecording, setIsRecording] = useState(false);
@@ -70,6 +19,54 @@ const RecordModal = ({ sample, onClose, onUpdateSuccess }) => {
   const audioChunksRef = useRef([]);
   const streamRef = useRef(null);
   const recordingStartTimeRef = useRef(null);
+
+  const modalRef = useRef(null);
+  const previouslyFocusedRef = useRef(null);
+
+  useEffect(() => {
+    previouslyFocusedRef.current = document.activeElement;
+
+    const modalNode = modalRef.current;
+    const getFocusable = () =>
+      modalNode.querySelectorAll(
+        'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+      );
+
+    getFocusable()[0]?.focus();
+
+    const handleKeyDown = (e) => {
+      if (e.key === "Escape") {
+        onClose();
+        return;
+      }
+      if (e.key !== "Tab") return;
+
+      const focusableEls = Array.from(getFocusable());
+      if (focusableEls.length === 0) return;
+
+      const first = focusableEls[0];
+      const last = focusableEls[focusableEls.length - 1];
+
+      if (e.shiftKey) {
+        if (document.activeElement === first) {
+          e.preventDefault();
+          last.focus();
+        }
+      } else {
+        if (document.activeElement === last) {
+          e.preventDefault();
+          first.focus();
+        }
+      }
+    };
+
+    document.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      document.removeEventListener("keydown", handleKeyDown);
+      previouslyFocusedRef.current?.focus?.();
+    };
+  }, [onClose]);
 
   const startRecording = async () => {
     setError(null); // Clear errors when starting fresh
@@ -191,7 +188,14 @@ const RecordModal = ({ sample, onClose, onUpdateSuccess }) => {
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+      <div
+        className="modal-content"
+        onClick={(e) => e.stopPropagation()}
+        ref={modalRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Re-record Sample"
+      >
         <button
           className="close-button"
           onClick={onClose}
