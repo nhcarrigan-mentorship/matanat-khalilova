@@ -1,4 +1,4 @@
-import React, { useRef, useState } from "react";
+import React, { useRef, useState, useEffect } from "react";
 import { Mic, Square, X, Play, Pause, Save, FileAudio2 } from "lucide-react";
 import "./RecordModal.css";
 import { clientFetch } from "../../apiConfig";
@@ -19,6 +19,54 @@ const RecordModal = ({ sample, onClose, onUpdateSuccess }) => {
   const audioChunksRef = useRef([]);
   const streamRef = useRef(null);
   const recordingStartTimeRef = useRef(null);
+
+  const modalRef = useRef(null);
+  const previouslyFocusedRef = useRef(null);
+
+  useEffect(() => {
+    previouslyFocusedRef.current = document.activeElement;
+
+    const modalNode = modalRef.current;
+    const getFocusable = () =>
+      modalNode.querySelectorAll(
+        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
+      );
+
+    getFocusable()[0]?.focus();
+
+    const handleKeyDown = (e) => {
+      if (e.key === "Escape") {
+        onClose();
+        return;
+      }
+      if (e.key !== "Tab") return;
+
+      const focusableEls = Array.from(getFocusable());
+      if (focusableEls.length === 0) return;
+
+      const first = focusableEls[0];
+      const last = focusableEls[focusableEls.length - 1];
+
+      if (e.shiftKey) {
+        if (document.activeElement === first) {
+          e.preventDefault();
+          last.focus();
+        }
+      } else {
+        if (document.activeElement === last) {
+          e.preventDefault();
+          first.focus();
+        }
+      }
+    };
+
+    document.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      document.removeEventListener("keydown", handleKeyDown);
+      previouslyFocusedRef.current?.focus?.();
+    };
+  }, [onClose]);
 
   const startRecording = async () => {
     setError(null); // Clear errors when starting fresh
@@ -140,7 +188,14 @@ const RecordModal = ({ sample, onClose, onUpdateSuccess }) => {
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+      <div
+        className="modal-content"
+        onClick={(e) => e.stopPropagation()}
+        ref={modalRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Re-record Sample"
+      >
         <button
           className="close-button"
           onClick={onClose}

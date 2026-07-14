@@ -153,6 +153,11 @@
   animation: fadeIn 0.4s ease-out;
 }
 
+.pill-play-button:focus-visible {
+  outline: 2px solid #8b5cf6;
+  outline-offset: 2px;
+}
+
 @keyframes fadeIn {
   from {
     opacity: 0;
