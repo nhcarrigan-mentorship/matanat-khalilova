@@ -33,6 +33,7 @@ from fastapi import (
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, EmailStr, field_validator
+from silero_vad import VADIterator, load_silero_vad
 
 from audio_utils import (
     process_voice_profile_training,
@@ -47,15 +48,7 @@ router = APIRouter()
 
 load_dotenv()
 
-VAD_MODEL, utils = torch.hub.load(
-    repo_or_dir="snakers4/silero-vad",
-    model="silero_vad",
-    force_reload=False,
-    trust_repo=True,
-    skip_validation=True,
-)
-
-get_speech_timestamps, save_audio, read_audio, VADIterator, collect_chunks = utils
+VAD_MODEL = load_silero_vad()
 
 cloudinary.config(
     cloud_name=os.getenv("CLOUDINARY_CLOUD_NAME"),
